@@ -25,9 +25,6 @@ cho đồng thời:
 
 Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời giải mà là một tập Pareto.
 
-Công thức chi tiết, các lỗi trong bài báo mà nhóm đã sửa và các giả định nhóm tự chốt nằm trong
-[CLAUDE.md](CLAUDE.md). Đọc file đó trước khi sửa decoder.
-
 ## Tiến độ
 
 | Giai đoạn | Thời gian | Nội dung | Trạng thái |
@@ -89,7 +86,55 @@ chỉ lưu bản 100. Nhóm dùng chín cấu hình theo đúng bài báo:
 | 50 | C102, R201, RC202 |
 | 100 | C102, R201, RC201 |
 
-**Case thực tế.** 29 điểm giao hàng của một công ty logistics, lấy từ Table 8 của bài báo.
+**Case thực tế.** 29 điểm giao hàng của một công ty logistics, lấy từ Table 8 của bài báo, lưu ở
+`data/paper/case29.csv`. File `data/paper/fixture_routes.csv` chứa ba lời giải mẫu bài báo công bố
+(Tables 11, 12, 13), dùng để kiểm tra decoder.
+
+## Chỉnh sửa bài báo và giả định của nhóm
+
+Bài báo có vài công thức sai và nhiều chỗ không nói rõ. Mục này ghi lại cách nhóm xử lý, để cả nhóm
+code theo cùng một cách hiểu. Muốn đổi điều nào thì bàn với cả nhóm trước, vì mọi con số phía sau
+đều phụ thuộc vào đây.
+
+### Những chỗ bài báo sai, nhóm đã sửa
+
+1. **Hàm hiệu chỉnh khí thải sai bậc.** Bài báo in số hạng `0.0011·v³`. Với v = 40 km/h hàm này ra
+   số âm, tức là xe càng chạy thì khí thải càng giảm. Nhóm dùng `0.0011·v²`. Khi đó mỗi km xe
+   thải khoảng 679 g CO₂.
+2. **Khí thải tỉ lệ thuận với quãng đường.** Vận tốc là hằng số và hàm hiệu chỉnh không phụ thuộc
+   tải trọng, nên f2 chỉ là một hằng số nhân tổng km, giống hệt khoản chi phí theo km trong f1.
+   Thực chất bài toán chỉ có hai chiều độc lập. Nhóm giữ nguyên mô hình để so được số với bài báo,
+   nhưng sẽ đo hệ số tương quan giữa ba mục tiêu và đưa vào báo cáo.
+3. **Công thức hài lòng thừa một dấu tổng** theo xe, và cho giá trị thang 0–100 trong khi bảng kết
+   quả dùng thang 0–1. Nhóm bỏ tổng theo xe và chia cho 100.
+4. **Tải trọng xe không thống nhất.** Bài báo ghi 400 kg cho benchmark và 4000 kg cho case thực
+   tế. Nhóm dùng đúng hai số này và sẽ kiểm tra lại con số 400 kg ở giai đoạn 1.
+5. **Lỗi gõ ở Table 11.** Tuyến 7 in là `0-13-9-27-0`, nhưng đúng phải là `0-13-9-29-0`. Với bản
+   đã sửa, độ dài tuyến khớp số bài báo và mỗi khách xuất hiện đúng một lần.
+
+### Một chỗ đáng ngờ, chưa kết luận
+
+Theo công thức đã sửa, lời giải ở Table 12 (337.09 km) phải thải khoảng **229 kg** CO₂, nhưng bài
+báo báo **140.65 kg**, tức chỉ khoảng 417 g/km. Nhóm giữ công thức, không
+chỉnh hệ số cho khớp. Khi kiểm tra decoder, nếu mọi thứ khác đều khớp mà riêng f2 lệch khoảng 0.61
+lần thì đó là bất nhất của bài báo, không phải lỗi code.
+
+### Giả định nhóm tự chốt
+
+| Vấn đề | Nhóm chọn |
+|---|---|
+| Đơn vị bên trong code | thời gian tính bằng phút, khối lượng bằng kg, khoảng cách bằng km. Mọi phép đổi đơn vị làm một lần khi đọc dữ liệu |
+| Khoảng cách | Euclid trên toạ độ gốc, không làm tròn |
+| Thời gian chạy giữa hai điểm | khoảng cách chia vận tốc 40 km/h, đổi ra phút |
+| Phạt sớm/muộn | hệ số tính theo CNY/giờ, nên số phút sớm hoặc muộn phải chia 60 |
+| Xe đến sớm | xe chờ đến đầu khung kỳ vọng rồi mới phục vụ. Mức hài lòng tính theo giờ đến |
+| Giờ xe rời kho | lúc kho mở cửa: phút 0 với Solomon, 6:00 với case thực tế |
+| Hai khung giờ cho Solomon | khung trong file là khung kỳ vọng. Khung chấp nhận được là khung đó nới thêm 30 phút mỗi đầu, không xuống dưới 0 |
+| Hai khung giờ cho case thực tế | bài báo chỉ cho một khung, nhóm dùng nó cho cả hai. Giao trong khung thì hài lòng 100%, ngoài khung thì 0% |
+| Xác suất đột biến | 0.1 cho benchmark, 0.2 cho case thực tế |
+
+Hai giả định về giờ rời kho và khung giờ của case thực tế dựa trên kết quả bài báo: họ báo mức hài
+lòng tối đa 1.0000, chỉ đạt được nếu xe xuất phát lúc 6:00 và mọi khách được giao trong khung.
 
 ## Bốn cải tiến
 
