@@ -1,6 +1,6 @@
 # NSGA-II cho bài toán định tuyến xe xanh đa mục tiêu có khung thời gian
 
-Bài tập lớn môn **Tính toán tiến hóa**, nhóm 4 người, hạn nộp 30/11/2026.
+Bài tập lớn môn **Tính toán tiến hóa**, nhóm 4 người.
 
 Repo cài đặt thuật toán NSGA-II để giải bài toán MOGVRPTW (Multi-Objective Green Vehicle Routing
 Problem with Time Windows), thêm bốn cải tiến và đo xem mỗi cải tiến đóng góp bao nhiêu. Kết quả
@@ -32,11 +32,11 @@ Công thức chi tiết, các lỗi trong bài báo mà nhóm đã sửa và cá
 
 | Giai đoạn | Thời gian | Nội dung | Trạng thái |
 |---|---|---|---|
-| 0 | 31/10 – 1/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | đang làm |
-| 1 | 3/11 – 9/11 | Validate decoder với số liệu bài báo, NSGA-II baseline, bộ đo | |
-| 2 | 10/11 – 16/11 | Bốn nhánh cải tiến | |
-| 3 | 17/11 – 23/11 | Merge, ablation, tuning | |
-| 4 | 24/11 – 30/11 | Chạy đầy đủ, báo cáo, slide | |
+| 0 | 3/11 – 4/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | đang làm |
+| 1 | 5/11 – 11/11 | Validate decoder với số liệu bài báo, NSGA-II baseline, bộ đo | |
+| 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | |
+| 3 | 19/11 – 25/11 | Merge, ablation, tuning | |
+| 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | |
 
 ## Cài đặt
 

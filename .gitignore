@@ -4,3 +4,9 @@ __pycache__/
 .pytest_cache/
 results/*
 !results/.gitkeep
+
+# PDF bai bao: giu o may, khong dua len git
+symmetry-17-00734*.pdf
+
+# Ghi chu rieng cho Claude Code, khong dua len git
+CLAUDE.md
