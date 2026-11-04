@@ -13,6 +13,10 @@ Problem with Time Windows), thêm bốn cải tiến và đo xem mỗi cải ti�
 Bài báo dùng NSGA-III. Nhóm dùng NSGA-II và so với cả hai cột NSGA-II và INSGA-III trong các bảng
 kết quả của họ.
 
+Bài báo là nguồn mô hình, tham số, dữ liệu và là mốc để so sánh, không phải đáp án. Bài báo có công
+thức sai và nhiều chỗ không nói rõ, nên nhóm không cố tái tạo đúng số của họ. Code được kiểm bằng test
+tính tay theo mô hình của nhóm. Chỗ nào số lệch bài báo thì ghi vào báo cáo kèm nguyên nhân.
+
 ## Bài toán
 
 Một kho, một đội xe tải giống nhau, n khách. Mỗi khách có toạ độ, lượng hàng cần giao, thời gian dỡ
@@ -27,13 +31,217 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 
 ## Tiến độ
 
-| Giai đoạn | Thời gian | Nội dung | Trạng thái |
-|---|---|---|---|
-| 0 | 3/11 – 4/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | đang làm |
-| 1 | 5/11 – 11/11 | Validate decoder với số liệu bài báo, NSGA-II baseline, bộ đo | |
-| 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | |
-| 3 | 19/11 – 25/11 | Merge, ablation, tuning | |
-| 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | |
+| Giai đoạn | Thời gian | Nội dung | Số người | Trạng thái |
+|---|---|---|---|---|
+| 0 | 3/11 – 4/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | 1 | xong |
+| 1 | 5/11 – 11/11 | Test decoder, NSGA-II baseline, bộ đo | 1 | |
+| 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | 3 | |
+| 3 | 19/11 – 25/11 | Merge, ablation, tuning | 3 | |
+| 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | 4 | |
+
+## Phân công
+
+| Mã | Thành viên |
+|---|---|
+| TV1 | *(điền tên)* |
+| TV2 | *(điền tên)* |
+| TV3 | *(điền tên)* |
+| TV4 | *(điền tên)* |
+
+### Giai đoạn 0 (3/11 – 4/11): TV1
+
+- [x] Cấu trúc thư mục, môi trường Python 3.11, `requirements.txt`, `config.yaml`
+- [x] Dữ liệu Solomon, `data/paper/case29.csv`, `data/paper/fixture_routes.csv`
+- [x] `src/instance.py`: đọc instance, đổi đơn vị, sinh hai khung giờ
+- [x] `src/decoder.py`: split, tính giờ đến, tính f1, f2, f3
+- [x] `scripts/smoke_phase0.py`: chạy thử decoder trên cả 10 instance
+
+### Giai đoạn 1 (5/11 – 11/11): TV1
+
+Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, làm nền cho ba người làm cải tiến ở giai đoạn 2.
+
+- [ ] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
+      test bất biến (mỗi khách đúng một lần, không vượt tải)
+- [ ] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
+- [ ] Kiểm tra tải trọng 400 kg: số xe tối thiểu so với số xe bài báo dùng
+- [ ] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
+      vòng lặp chính. Chỉ dùng một bộ sinh ngẫu nhiên có seed
+- [ ] `src/metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
+- [ ] `src/runner.py`: chạy 10 seed trên một cấu hình, lưu kết quả thô vào `results/`
+- [ ] Gõ số liệu so sánh của bài báo vào `data/paper/paper_metrics.csv`, `data/paper/paper_objectives.csv`
+- [ ] Đo hệ số tương quan giữa f1, f2, f3 trên front của baseline
+- [ ] Bàn giao: chốt interface, viết hướng dẫn ngắn cách thêm một cải tiến (cờ trong config, chỗ gắn
+      vào vòng lặp)
+
+Cổng: test decoder pass; baseline hội tụ, tốt hơn hẳn lời giải ngẫu nhiên, ổn định qua 10 seed.
+
+### Giai đoạn 2 (12/11 – 18/11): TV2, TV3, TV4
+
+Mỗi người một branch, mỗi cải tiến một file trong `src/improvements/`, bật tắt bằng một cờ trong
+`config.yaml`, mặc định tắt.
+
+| Người | Cải tiến | Việc cụ thể |
+|---|---|---|
+| TV2 | `init_smart`, `local_search` | khởi tạo trộn nearest-neighbor, sắp theo khung giờ và ngẫu nhiên; 2-opt và Or-opt trên từng tuyến sau đột biến |
+| TV3 | `diversity` | SDE hoặc kNN density thay crowding distance; external archive |
+| TV4 | `dp_split` | split tối ưu bằng quy hoạch động (mỗi lần gọi chọn ngẫu nhiên một mục tiêu hoặc trọng số); Pc/Pm thích nghi |
+
+Mỗi người đều phải:
+
+- [ ] Viết test riêng cho cải tiến của mình
+- [ ] Chứng minh tắt cờ thì ra đúng kết quả baseline với cùng seed
+- [ ] Chạy 10 seed trên ít nhất 3 instance, so HV với baseline
+
+#### Quy tắc chung cho cả ba người
+
+- Branch đặt tên `feat/<tên-cải-tiến>`, ví dụ `feat/init-smart`. Không sửa thẳng `main`.
+- Không đổi chữ ký của `load_instance`, `evaluate`, `evaluate_detail`. Cần thêm thông tin thì thêm
+  trường vào `Instance` hoặc thêm hàm mới.
+- Mọi tham số mới (tỉ lệ, xác suất, kích thước archive...) để trong `config.yaml`, dưới mục
+  `improvements`.
+- Chỉ dùng bộ sinh ngẫu nhiên mà `nsga2.py` truyền vào, không tự tạo `random` hay
+  `np.random` riêng. **Khi cờ tắt, code của cải tiến không được gọi bộ sinh ngẫu nhiên lần nào.** Nếu
+  gọi dù chỉ một lần thì dãy số ngẫu nhiên phía sau bị lệch, và kết quả không còn giống baseline.
+
+#### TV2: `init_smart`, khởi tạo quần thể thông minh
+
+- **Gắn vào đâu:** thay bước tạo quần thể ban đầu ngẫu nhiên trong `nsga2.py`.
+- **Làm gì:** sinh `nPop` hoán vị bằng ba cách, tỉ lệ đặt trong config (ví dụ 20% / 20% / 60%):
+  - *Nearest-neighbor:* bắt đầu từ kho, mỗi bước chọn khách chưa ghé gần nhất.
+  - *Theo khung giờ:* sắp khách theo giờ mở khung `ETa`, bằng nhau thì xét khoảng cách.
+  - *Ngẫu nhiên:* như baseline.
+
+  Hai cách đầu luôn cho cùng một hoán vị, nên cần xáo nhẹ vài vị trí (hoặc chọn ngẫu nhiên trong vài
+  khách gần nhất) để quần thể không có nhiều cá thể trùng nhau.
+- **Test:** mọi cá thể là hoán vị hợp lệ của 1..n; tỉ lệ ba nhóm đúng như config; HV của quần thể ban
+  đầu cao hơn khởi tạo ngẫu nhiên.
+
+#### TV2: `local_search`, tìm kiếm cục bộ
+
+- **Gắn vào đâu:** sau đột biến, trước khi đánh giá con.
+- **Làm gì:** với xác suất `p_ls`, giải mã con thành các tuyến, rồi cải thiện từng tuyến bằng:
+  - *2-opt:* đảo ngược một đoạn trong tuyến.
+  - *Or-opt:* chuyển một đoạn 1–3 khách sang vị trí khác trong cùng tuyến.
+
+  Có ba mục tiêu nên phải định nghĩa thế nào là "tốt hơn". Hai cách: nhận bước đi nếu tuyến mới trội
+  hơn tuyến cũ, hoặc nhận nếu tổng có trọng số ngẫu nhiên giảm. Giới hạn số vòng lặp để không chạy quá
+  lâu.
+- **Cẩn thận:** nối các tuyến đã cải thiện lại thành hoán vị, rồi split tham lam lần nữa, có thể ra bộ
+  tuyến **khác**. Sau 2-opt, khách đầu tuyến sau có thể vừa chỗ vào tuyến trước. Phải kiểm tra điều này,
+  nếu không thì phần cải thiện bị mất khi đánh giá.
+- **Test:** mỗi tuyến giữ nguyên tập khách; không có bước nào làm tuyến tệ hơn theo tiêu chí đã chọn;
+  hoán vị ghép lại khi split lại ra đúng bộ tuyến đó.
+
+#### TV3: `diversity`, cơ chế giữ đa dạng
+
+- **Gắn vào đâu:** bước chọn lọc môi trường, khi phải chọn bớt cá thể trong front cuối cùng. Thay
+  crowding distance bằng một độ đo mật độ khác.
+- **Làm gì:**
+  - *SDE (shift-based density estimation):* khi đo mật độ quanh cá thể p, dịch các cá thể khác về
+    phía p ở những mục tiêu mà chúng tốt hơn p, rồi mới đo khoảng cách. Cách này phạt các cá thể chỉ
+    giỏi một mục tiêu.
+  - *Hoặc kNN density:* khoảng cách tới láng giềng gần thứ k.
+
+  Chọn một trong hai bằng config. Chuẩn hoá ba mục tiêu về [0, 1] trước khi đo khoảng cách, vì f1 cỡ
+  vài nghìn còn f3 nhỏ hơn 1.
+- **External archive:** lưu mọi lời giải không bị trội tìm được qua các generation, giới hạn kích
+  thước. Khi đầy thì loại cá thể ở vùng đông nhất. Khi bật archive, kết quả cuối là archive chứ không
+  phải front của quần thể cuối.
+- **Test:** trên một tập điểm nhỏ tự dựng, thứ hạng mật độ đúng như tính tay; archive chỉ chứa lời giải
+  không bị trội và không vượt kích thước tối đa.
+
+#### TV4: `dp_split`, split tối ưu bằng quy hoạch động
+
+- **Gắn vào đâu:** thay `split_greedy` trong decoder khi cờ bật.
+- **Làm gì (thuật toán split của Prins):** giữ nguyên thứ tự hoán vị, chỉ chọn chỗ cắt tối ưu. Dựng đồ
+  thị có các nút 0..n là các vị trí cắt. Cung (i, j) nghĩa là một tuyến phục vụ các khách ở vị trí
+  i+1..j, chỉ tồn tại khi không vượt tải. Trọng số của cung là chi phí của tuyến đó. Tìm đường ngắn nhất
+  từ 0 đến n bằng quy hoạch động.
+- **Chi phí một tuyến:** chỉ tối ưu được một con số. Chọn ngẫu nhiên một mục tiêu hoặc một tổng có
+  trọng số ngẫu nhiên, đã chuẩn hoá. **Trọng số phải gắn với từng cá thể và lưu lại**, không được chọn
+  lại mỗi lần đánh giá. Nếu chọn lại thì cùng một hoán vị đánh giá hai lần sẽ ra hai kết quả khác nhau.
+- **Pc/Pm thích nghi:** Pc và Pm thay đổi trong một khoảng đặt trong config. Ví dụ: cá thể ở front tốt
+  thì lai và đột biến ít hơn, hoặc tăng Pm khi HV không cải thiện sau vài generation.
+- **Test:** với n ≤ 8, kết quả DP bằng kết quả thử hết mọi cách cắt; DP không bao giờ tệ hơn split tham
+  lam trên mục tiêu đã chọn; Pc, Pm luôn nằm trong khoảng cho phép.
+
+### Giai đoạn 3 (19/11 – 25/11): TV2, TV3, TV4
+
+| Người | Việc |
+|---|---|
+| TV2 | Merge bốn branch vào `main`, giải quyết xung đột; test hồi quy: tắt hết cờ phải ra đúng baseline |
+| TV3 | Ablation: từng cải tiến riêng, bật tất cả, bật tất cả trừ một; tính delta HV và p-value (Wilcoxon rank-sum) |
+| TV4 | Tuning tham số của các cải tiến; kiểm tra `dp_split` và `local_search` có dẫm chân nhau không |
+
+Cổng: mỗi cải tiến có một con số delta HV kèm p-value.
+
+#### TV2: merge và test hồi quy
+
+- **Trước khi merge:** lưu kết quả baseline làm mốc, gồm front cuối của 3 instance × 2 seed, vào
+  `tests/test_regression.py`.
+- **Merge từng branch một vào `main`.** Sau mỗi lần merge, chạy đủ ba loại test:
+  - test của các branch đã merge,
+  - test decoder,
+  - test hồi quy: tắt hết cờ phải ra **đúng từng số** như mốc baseline.
+
+  Fail thì sửa ngay trước khi merge branch tiếp theo, để biết lỗi do branch nào gây ra.
+- Xung đột hay gặp nhất là ở `nsga2.py` (chỗ gắn các cải tiến) và `config.yaml`.
+- Sau khi merge đủ bốn branch, bật tất cả cờ rồi chạy thử: không lỗi, và ghi lại thời gian chạy.
+
+#### TV3: ablation, đo đóng góp của từng cải tiến
+
+- **10 cấu hình:**
+
+  | Nhóm | Cấu hình | Số cấu hình |
+  |---|---|---|
+  | Mốc | baseline, tắt hết | 1 |
+  | Bật từng cái | chỉ bật một cải tiến | 4 |
+  | Bật tất cả | | 1 |
+  | Bật tất cả trừ một | tắt đúng một cải tiến | 4 |
+
+  "Bật từng cái" cho biết cải tiến đó tốt đến đâu khi đứng riêng. "Bật tất cả trừ một" cho biết nó còn
+  đóng góp bao nhiêu khi đã có các cải tiến khác.
+- **Instance:** giai đoạn này chạy trên một tập nhỏ đại diện, ví dụ C102-25, R201-50, RC201-100 và case
+  thực tế. Bản đầy đủ chạy ở giai đoạn 4.
+- **Cách đo:** cùng bộ 10 seed cho mọi cấu hình.
+  - Tính HV, IGD, SP.
+  - Reference set của IGD gộp front của **cả 10 cấu hình**.
+  - Delta HV = HV trung bình của cấu hình trừ HV trung bình của baseline.
+  - p-value dùng Wilcoxon rank-sum.
+- **Ngân sách tính toán:** `local_search` và `dp_split` tốn thêm phép đánh giá, nên so theo số
+  generation là thiên vị cho chúng. Phải ghi lại số lần gọi `evaluate` của mỗi cấu hình và nêu trong báo
+  cáo. Nếu kịp thì chạy thêm một lượt so sánh với cùng số lần đánh giá.
+- **Đầu ra:** một bảng gồm cấu hình × instance, mỗi ô có HV (trung bình ± độ lệch chuẩn), delta HV và
+  p-value. Lưu vào `results/`.
+
+#### TV4: tuning và kiểm tra tương tác
+
+- **Tham số cần chỉnh:**
+  - tỉ lệ ba nhóm khởi tạo,
+  - `p_ls` và số vòng lặp tối đa của local search,
+  - kích thước archive và k,
+  - khoảng Pc/Pm thích nghi,
+  - cách chọn trọng số trong DP.
+- **Cách chỉnh:**
+  - Chỉnh từng tham số một (giữ các tham số khác cố định) trên 2–3 instance.
+  - Dùng **seed riêng cho tuning** (ví dụ 100–104), khác bộ seed 0–9 dùng để báo kết quả. Nếu dùng chung
+    thì tham số bị chỉnh vừa khít với chính các seed đó, và kết quả báo cáo sẽ đẹp hơn thực tế.
+- **Kiểm tra `dp_split` × `local_search`:** so ba cấu hình: chỉ `dp_split`, chỉ `local_search`, và bật
+  cả hai. Nếu bật cả hai mà tệ hơn bật một cái thì tìm nguyên nhân và đề xuất cách sửa, ví dụ giảm
+  `p_ls` khi đã bật DP.
+- **Đầu ra:** giá trị đã chọn ghi vào `config.yaml`, kèm comment lý do. Sau giai đoạn 3 thì **khoá
+  config**, giai đoạn 4 không chỉnh nữa.
+
+### Giai đoạn 4 (26/11 – 2/12): cả nhóm
+
+| Người | Việc |
+|---|---|
+| TV1 | Chạy đầy đủ 10 seed trên 9 instance Solomon và case thực tế; bảng so sánh với cột NSGA-II và INSGA-III của bài báo |
+| TV2 | Hình vẽ: Pareto front 3D, đường hội tụ HV, boxplot HV/IGD qua 10 seed |
+| TV3 | Báo cáo: mô hình, các chỗ sửa bài báo, giả định của nhóm, kết quả và thảo luận |
+| TV4 | Slide thuyết trình; nếu kịp, thí nghiệm thêm với vận tốc khác nhau theo cung đường |
+
+Mỗi người viết phần báo cáo về việc mình đã làm ở giai đoạn 2 và 3, TV3 ghép và thống nhất văn phong.
 
 ## Cài đặt
 
@@ -71,6 +279,7 @@ src/
   metrics.py      HV, IGD, SP, SC, DM
   runner.py       chạy nhiều run, lưu kết quả thô
   improvements/   bốn cải tiến, mỗi cải tiến một file
+scripts/          script chạy thử, chạy bằng python -m scripts.<tên>
 tests/            test tự động
 results/          kết quả chạy, không đưa lên git
 ```
@@ -112,12 +321,12 @@ code theo cùng một cách hiểu. Muốn đổi điều nào thì bàn với c
 5. **Lỗi gõ ở Table 11.** Tuyến 7 in là `0-13-9-27-0`, nhưng đúng phải là `0-13-9-29-0`. Với bản
    đã sửa, độ dài tuyến khớp số bài báo và mỗi khách xuất hiện đúng một lần.
 
-### Một chỗ đáng ngờ, chưa kết luận
+### Một chỗ bài báo tự mâu thuẫn
 
-Theo công thức đã sửa, lời giải ở Table 12 (337.09 km) phải thải khoảng **229 kg** CO₂, nhưng bài
-báo báo **140.65 kg**, tức chỉ khoảng 417 g/km. Nhóm giữ công thức, không
-chỉnh hệ số cho khớp. Khi kiểm tra decoder, nếu mọi thứ khác đều khớp mà riêng f2 lệch khoảng 0.61
-lần thì đó là bất nhất của bài báo, không phải lỗi code.
+Theo công thức đã sửa, lời giải ở Table 12 (337.09 km) phải thải **229.03 kg** CO₂, và decoder của
+nhóm cho đúng số đó. Bài báo lại báo **140.65 kg**, tức chỉ khoảng 417 g/km, trong khi chỗ khác của
+bài báo ngầm định khoảng 680 g/km. Nhóm giữ công thức, không chỉnh hệ số cho khớp, và ghi chỗ này
+vào báo cáo.
 
 ### Giả định nhóm tự chốt
 
