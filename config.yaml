@@ -74,6 +74,11 @@ improvements:
   local_search: false
   diversity: false
   dp_split: false
+  # Tham so cua dp_split (chi dung khi dp_split = true)
+  dp_split_params:
+    weight_dist: dirichlet    # phan phoi trong so moi ca the: dirichlet | single_objective (nsga2 se doc)
+    weight_inherit: fresh     # con thua huong trong so the nao: fresh | parent (chua dung)
+    g3_scale: 1.0             # he so chuan hoa g3 (g3 da nam trong [0,1]); f1, f2 lay trung binh greedy
 
 # ---------------------------------------------------------------------------
 # Chi so danh gia
