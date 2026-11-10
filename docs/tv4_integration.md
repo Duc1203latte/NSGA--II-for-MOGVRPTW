@@ -7,6 +7,8 @@ Dành cho TV1/TV2. Hai cải tiến độc lập, mỗi cái một cờ trong `c
 | File | Hàm / lớp | Việc |
 |---|---|---|
 | `src/improvements/dp_split.py` | `evaluate_dp(perm, inst, weights, scales=None) -> dict` | split tối ưu (Prins) rồi chấm bằng `evaluate_routes_detail`; thêm khoá `weights`, `split="dp"` |
+| | `sample_weights(rng, params) -> ndarray(3)` | trọng số cho cá thể mới; `params` = `cfg["improvements"]["dp_split_params"]` |
+| | `child_weights(rng, wa, wb, params) -> ndarray(3)` | trọng số cho con theo `weight_inherit` |
 | | `split_dp`, `objective_scales(inst)` | `scales` tất định, cache theo instance, không RNG |
 | `src/improvements/adaptive.py` | `resolve_params(adaptive_params, nsga2_cfg, case29)` | gộp khoảng pc/pm + pc/pm gốc thành dict phẳng |
 | | `adaptive_rates(rank_a, rank_b, max_rank, params, front1_fraction, pm_boost=1.0) -> (pc, pm)` | pc/pm theo hạng cha mẹ tốt hơn |
@@ -15,11 +17,11 @@ Dành cho TV1/TV2. Hai cải tiến độc lập, mỗi cái một cờ trong `c
 
 ## Chỗ gắn vào vòng lặp `nsga2.py`
 
-1. **Tạo cá thể** (chỉ khi `dp_split` bật): lấy trọng số bằng `rng` do nsga2 truyền vào, rồi lưu `ind.extra["weights"]`.
-   `weight_dist: dirichlet` → `rng.dirichlet([1, 1, 1])`; `single_objective` → vector one-hot ngẫu nhiên.
+1. **Tạo cá thể** (chỉ khi `dp_split` bật): `ind.extra["weights"] = sample_weights(rng, params)`, `rng` là bộ sinh nsga2 truyền vào.
+   `weight_dist: dirichlet` → đúng 1 lần `rng.dirichlet`; `onehot` → đúng 1 lần `rng.integers(3)`.
    Trọng số gắn với cá thể, **không chọn lại khi đánh giá** (cùng hoán vị + cùng trọng số luôn ra cùng kết quả).
 2. **Đánh giá:** `dp_split` bật → `evaluate_dp(perm, inst, ind.extra["weights"])`, ngược lại → `evaluate` như cũ. Lấy `f1, f2, f3` từ dict trả về.
-3. **Sinh con:** theo `weight_inherit`. Hiện chỉ cài `fresh` (con bốc trọng số mới, giống bước 1); `parent` chưa cài, `nsga2` đọc khoá này.
+3. **Sinh con:** `child.extra["weights"] = child_weights(rng, wa, wb, params)`. `fresh` → bốc mới, cùng số lần rng như bước 1; `parent` → chép trọng số của một cha mẹ, đúng 1 lần `rng.integers(2)`. Cả hai hàm chỉ dùng `rng` được truyền vào.
 4. **Mỗi cặp ghép:** `adaptive_rates(rank_a, rank_b, max_rank, params, front1_fraction, pm_boost=tracker.multiplier)`. `rank` tính từ 0 (front 1), `max_rank` là hạng lớn nhất hiện có, `front1_fraction = |front 1| / n_pop`. Dùng `resolve_params(cfg["improvements"]["adaptive_params"], cfg["nsga2"], case29=...)` một lần trước vòng lặp.
 5. **Mỗi generation:** `tracker.update(objectives_của_front_1)` (mảng m×3). Tracker chỉ đếm khi `stagnation_gens > 0`.
 
@@ -32,7 +34,7 @@ Dành cho TV1/TV2. Hai cải tiến độc lập, mỗi cái một cờ trong `c
 
 ## Quy tắc RNG: cờ tắt thì không gọi RNG lần nào
 
-Hai module này **không tự tạo hay gọi RNG**. Việc bốc trọng số nằm ở `nsga2.py` và phải nằm sau `if cfg["improvements"]["dp_split"]:`. Cờ tắt mà vẫn bốc trọng số thì dãy số ngẫu nhiên bị lệch và không còn khớp baseline. Hai cờ `dp_split` và `adaptive_rates` bật tắt riêng, để ablation đo riêng được.
+Hai module này **không tự tạo RNG**, chỉ dùng `rng` được truyền vào, và chỉ trong `sample_weights`/`child_weights`. `nsga2.py` chỉ được gọi hai hàm này khi `cfg["improvements"]["dp_split"]` là true. Cờ tắt mà vẫn gọi thì dãy số ngẫu nhiên bị lệch và không còn khớp baseline. Hai cờ `dp_split` và `adaptive_rates` bật tắt riêng, để ablation đo riêng được.
 
 ## Chi phí đo được
 

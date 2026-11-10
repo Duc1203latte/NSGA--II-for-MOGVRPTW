@@ -10,8 +10,31 @@ from src.decoder import evaluate_routes_detail, split_greedy
 from src.instance import load_instance
 from src.improvements import dp_split as dps
 from src.improvements.dp_split import (
-    _build_arcs, evaluate_dp, objective_scales, route_cost_terms, split_dp,
+    _build_arcs, child_weights, evaluate_dp, objective_scales, route_cost_terms,
+    sample_weights, split_dp,
 )
+from src.instance import load_config
+
+DP_PARAMS = load_config()["improvements"]["dp_split_params"]
+
+
+class CountingRng:
+    """Boc np.random.Generator, dem so lan goi moi phuong thuc sinh so."""
+
+    def __init__(self, seed):
+        self.rng, self.calls = np.random.default_rng(seed), []
+
+    def __getattr__(self, name):
+        fn = getattr(self.rng, name)
+
+        def wrapped(*a, **k):
+            self.calls.append(name)
+            return fn(*a, **k)
+        return wrapped
+
+
+def same_state(rng_a, rng_b):
+    return rng_a.bit_generator.state == rng_b.bit_generator.state
 
 CORNERS = [np.array(w, float) for w in ([1, 0, 0], [0, 1, 0], [0, 0, 1])]
 G3_HEAVY = np.array([0.05, 0.05, 0.9])
@@ -176,3 +199,80 @@ def test_objective_scales_no_rng(monkeypatch):
     monkeypatch.setattr(dps, "_scales_cache", {})
     assert np.array_equal(s1, objective_scales(inst))  # tat dinh
     assert s1[2] == 1.0 and np.all(s1 >= dps.EPS)
+
+
+# ---------------------------------------------------------------- trong so: boc va thua huong
+def P_(**kw):
+    return {**DP_PARAMS, **kw}
+
+
+def test_sample_weights_dirichlet_on_simplex_and_deterministic():
+    p = P_(weight_dist="dirichlet")
+    rng = np.random.default_rng(0)
+    for _ in range(200):
+        w = sample_weights(rng, p)
+        assert w.shape == (3,) and np.all(w >= 0) and w.sum() == pytest.approx(1.0)
+    a = sample_weights(np.random.default_rng(42), p)
+    b = sample_weights(np.random.default_rng(42), p)
+    assert np.array_equal(a, b)
+
+
+def test_sample_weights_onehot():
+    p = P_(weight_dist="onehot")
+    rng, seen = np.random.default_rng(0), set()
+    for _ in range(100):
+        w = sample_weights(rng, p)
+        assert w.shape == (3,) and sorted(w.tolist()) == [0.0, 0.0, 1.0]
+        seen.add(int(np.argmax(w)))
+    assert seen == {0, 1, 2}
+    assert np.array_equal(sample_weights(np.random.default_rng(7), p),
+                          sample_weights(np.random.default_rng(7), p))
+
+
+@pytest.mark.parametrize("dist,call", [("dirichlet", "dirichlet"), ("onehot", "integers")])
+def test_sample_weights_exact_draws(dist, call):
+    c = CountingRng(3)
+    sample_weights(c, P_(weight_dist=dist))
+    assert c.calls == [call]                        # dung 1 lan goi
+    ref = np.random.default_rng(3)
+    ref.dirichlet([1, 1, 1]) if dist == "dirichlet" else ref.integers(3)
+    assert same_state(c.rng, ref)
+
+
+@pytest.mark.parametrize("dist", ["dirichlet", "onehot"])
+def test_child_weights_fresh(dist):
+    p = P_(weight_dist=dist, weight_inherit="fresh")
+    wa, wb = np.array([1.0, 0, 0]), np.array([0, 0, 1.0])
+    c1, c2 = CountingRng(5), np.random.default_rng(5)
+    w = child_weights(c1, wa, wb, p)
+    assert np.array_equal(w, sample_weights(c2, p))       # cung dong so voi sample_weights
+    assert len(c1.calls) == 1 and same_state(c1.rng, c2)
+    assert w.sum() == pytest.approx(1.0)
+
+
+def test_child_weights_parent():
+    p = P_(weight_inherit="parent")
+    wa, wb = np.array([0.2, 0.3, 0.5]), np.array([0.7, 0.2, 0.1])
+    c = CountingRng(11)
+    w = child_weights(c, wa, wb, p)
+    assert c.calls == ["integers"]                        # dung 1 lan rng.integers(2)
+    ref = np.random.default_rng(11)
+    pick = int(ref.integers(2))
+    assert same_state(c.rng, ref)
+    assert np.array_equal(w, (wa, wb)[pick])
+    w[0] = 99.0                                           # la ban sao, khong chung bo nho
+    assert wa[0] == 0.2 and wb[0] == 0.7
+    rng, picks = np.random.default_rng(0), set()
+    for _ in range(50):
+        picks.add(int(child_weights(rng, wa, wb, p)[0] == wb[0]))
+    assert picks == {0, 1}                                # ca hai cha me deu duoc chon
+    assert np.array_equal(child_weights(np.random.default_rng(1), wa, wb, p),
+                          child_weights(np.random.default_rng(1), wa, wb, p))
+
+
+def test_weight_modes_reject_unknown():
+    with pytest.raises(ValueError):
+        sample_weights(np.random.default_rng(0), P_(weight_dist="x"))
+    with pytest.raises(ValueError):
+        child_weights(np.random.default_rng(0), np.ones(3) / 3, np.ones(3) / 3,
+                      P_(weight_inherit="x"))

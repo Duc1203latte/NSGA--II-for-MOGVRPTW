@@ -80,6 +80,31 @@ def route_cost_terms(seq: list[int], inst: Instance) -> tuple[float, float, floa
     return st.terms()
 
 
+def sample_weights(rng, params: dict) -> np.ndarray:
+    """Trong so (w1, w2, w3) cho mot ca the moi. Chi dung rng duoc truyen vao.
+    dirichlet: 1 lan rng.dirichlet. onehot: 1 lan rng.integers(3)."""
+    dist = params["weight_dist"]
+    if dist == "dirichlet":
+        return np.asarray(rng.dirichlet([1.0, 1.0, 1.0]), dtype=float)
+    if dist == "onehot":
+        w = np.zeros(3)
+        w[int(rng.integers(3))] = 1.0
+        return w
+    raise ValueError(f"weight_dist = {dist!r} chua duoc ho tro")
+
+
+def child_weights(rng, parent_a_weights, parent_b_weights, params: dict) -> np.ndarray:
+    """Trong so cua con. fresh: boc moi (cung so lan rng nhu sample_weights).
+    parent: sao chep trong so cua mot cha me chon ngau nhien (dung 1 lan rng.integers(2))."""
+    mode = params["weight_inherit"]
+    if mode == "fresh":
+        return sample_weights(rng, params)
+    if mode == "parent":
+        src = parent_a_weights if int(rng.integers(2)) == 0 else parent_b_weights
+        return np.array(src, dtype=float)
+    raise ValueError(f"weight_inherit = {mode!r} chua duoc ho tro")
+
+
 def _nearest_neighbor(inst: Instance) -> list[int]:
     left = set(range(1, inst.n + 1))
     cur, out = 0, []
