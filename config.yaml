@@ -74,6 +74,15 @@ improvements:
   local_search: false
   diversity: false
   dp_split: false
+  adaptive_rates: false       # Pc/Pm thich nghi theo hang, tach rieng khoi dp_split
+  adaptive_params:
+    pc_min: 0.6               # pc = pc_min + (pc_max - pc_min) * r / R, r = hang tot nhat cua cha me
+    pc_max: 0.9
+    pm_min: 0.05              # khoang pm cho Solomon (pm goc 0.1 nam trong khoang)
+    pm_max: 0.3
+    pm_case29: {min: 0.1, max: 0.4}   # khoang pm rieng cho case29 (pm goc 0.2 nam trong khoang)
+    stagnation_gens: 0        # 0 = tat; front 1 khong doi qua ngan nay generation thi nhan pm them boost
+    boost: 1.5                # he so nhan pm khi tri tre, bi chan o pm_max
   # Tham so cua dp_split (chi dung khi dp_split = true)
   dp_split_params:
     weight_dist: dirichlet    # phan phoi trong so moi ca the: dirichlet | single_objective (nsga2 se doc)
