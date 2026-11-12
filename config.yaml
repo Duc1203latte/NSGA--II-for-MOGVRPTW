@@ -83,6 +83,14 @@ nsga2:
   pm:                         # xác suất đột biến
     solomon: 0.1
     case29: 0.2
+  eliminate_duplicates: true  # loại hoán vị trùng khi chọn cá thể sống sót; bản sao chỉ dùng
+                              # để lấp chỗ khi không đủ hoán vị khác nhau
+  tournament_size: 2          # số cá thể mỗi lượt chọn lọc giải đấu
+  crossover: ox               # ox  : order crossover, giữ nguyên một đoạn liền của cha 1
+                              # obx : order-based crossover như bài báo
+  mutation: standard          # standard : đột biến với xác suất pm, chọn inversion hoặc swap 50/50
+                              # always   : đứa con nào cũng đột biến; xác suất pm dùng inversion,
+                              #            còn lại dùng swap 
 
 experiment:
   n_runs: 10

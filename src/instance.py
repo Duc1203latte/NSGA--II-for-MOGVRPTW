@@ -36,8 +36,9 @@ def euclidean_matrix(coords: np.ndarray) -> np.ndarray:
     diff = coords[:, None, :] - coords[None, :, :]
     return np.hypot(diff[...,0], diff[...,1])
 
-def load_instance(name: str, n: int) -> Instance:
-    cfg = load_config()
+def load_instance(name: str, n: int, cfg: dict | None = None) -> Instance:
+    if cfg is None:
+        cfg = load_config()
     if name.lower() == "case29":
         inst = _load_case29(n, cfg)
     else:
