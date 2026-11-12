@@ -73,7 +73,7 @@ def main() -> int:
     snap_meta = {"_note": "mốc all-off của HARNESS TV2 (không phải nsga2.py của TV1)",
                  "_commit_at_capture": sha, "_python": sys.version.split()[0], **snap}
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-    FIXTURE.write_text(json.dumps(snap_meta, indent=1), encoding="utf-8")
+    FIXTURE.write_text(json.dumps(snap_meta, separators=(",", ":")) + "\n", encoding="utf-8")
     print("wrote", FIXTURE)
     return 0
 
