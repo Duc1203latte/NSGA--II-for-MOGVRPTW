@@ -23,6 +23,13 @@ speed_kmh: 40         # km/giờ, vận tốc cố định trên mọi cung đư
 #                   Đến sớm không bị trừ hài lòng, chỉ bị phạt chờ ở F4
 satisfaction_time: arrival
 
+
+# Cách cắt hoán vị thành các tuyến.
+#   capacity      : chỉ mở tuyến mới khi xe đầy hàng. Số xe gần như cố định theo tổng demand
+#   capacity_time : mở tuyến mới khi xe đầy hàng, HOẶC khi xe sẽ đến khách sau LT
+#                   (hết khung chấp nhận được) mà đội xe vẫn còn xe trống
+split_rule: capacity_time
+
 # Mô hình khí thải MEET, dùng cho f2:
 #   phi(v) = c0 + c1*v**3 + c2/v           [g/km]
 #   psi(v) = d0 + d1*v + d2*v**2 + d3/v    hệ số hiệu chỉnh

@@ -63,7 +63,7 @@ Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, l�
 - [ ] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
       test bất biến (mỗi khách đúng một lần, không vượt tải)
 - [ ] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
-- [ ] Kiểm tra tải trọng 400 kg: số xe tối thiểu so với số xe bài báo dùng
+- [x] Chốt tải trọng Solomon 400 kg và cách cắt tuyến `capacity_time` (12/11)
 - [ ] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
       vòng lặp chính. Chỉ dùng một bộ sinh ngẫu nhiên có seed
 - [ ] `src/metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
@@ -319,7 +319,7 @@ code theo cùng một cách hiểu. Muốn đổi điều nào thì bàn với c
 3. **Công thức hài lòng thừa một dấu tổng** theo xe, và cho giá trị thang 0–100 trong khi bảng kết
    quả dùng thang 0–1. Nhóm bỏ tổng theo xe và chia cho 100.
 4. **Tải trọng xe không thống nhất.** Bài báo ghi 400 kg cho benchmark và 4000 kg cho case thực
-   tế. Nhóm dùng đúng hai số này và sẽ kiểm tra lại con số 400 kg ở giai đoạn 1.
+   tế, trong khi capacity gốc của Solomon là 200 hoặc 1000. Nhóm dùng đúng hai số của bài báo.
 5. **Lỗi gõ ở Table 11.** Tuyến 7 in là `0-13-9-27-0`, nhưng đúng phải là `0-13-9-29-0`. Với bản
    đã sửa, độ dài tuyến khớp số bài báo và mỗi khách xuất hiện đúng một lần.
 
@@ -339,6 +339,8 @@ vào báo cáo.
 | Thời gian chạy giữa hai điểm | khoảng cách chia vận tốc 40 km/h, đổi ra phút |
 | Phạt sớm/muộn | hệ số tính theo CNY/giờ, nên số phút sớm hoặc muộn phải chia 60 |
 | Xe đến sớm | xe chờ đến đầu khung kỳ vọng rồi mới phục vụ, thời gian chờ bị phạt ở F4 |
+| Cắt hoán vị thành tuyến | khoá `split_rule` trong config. Mặc định `capacity_time`: mở xe mới khi xe đầy hàng, hoặc khi xe sẽ đến khách sau hết khung chấp nhận được mà đội xe còn xe trống. `capacity` (chỉ cắt khi đầy hàng) giữ lại để so sánh: với Solomon nó luôn cho cùng một số xe, nên thuật toán không thể thêm xe để kịp giờ |
+| Tải trọng xe Solomon | 400 kg theo bài báo |
 | Thời điểm tính mức hài lòng | làm cả hai cách, chọn bằng khoá `satisfaction_time` trong config: `arrival` tính theo giờ đến (mặc định), `service_start` tính theo giờ bắt đầu phục vụ. Hai cách chỉ khác nhau ở f3 |
 | Giờ xe rời kho | lúc kho mở cửa: phút 0 với Solomon, 6:00 với case thực tế |
 | Hai khung giờ cho Solomon | khung trong file là khung kỳ vọng. Khung chấp nhận được là khung đó nới thêm 30 phút mỗi đầu, không xuống dưới 0 |
@@ -347,6 +349,90 @@ vào báo cáo.
 
 Hai giả định về giờ rời kho và khung giờ của case thực tế dựa trên kết quả bài báo: họ báo mức hài
 lòng tối đa 1.0000, chỉ đạt được nếu xe xuất phát lúc 6:00 và mọi khách được giao trong khung.
+
+### Cách cắt hoán vị thành tuyến (`split_rule`), chốt 12/11
+
+**Bối cảnh.** Mỗi lời giải được mã hoá bằng một hoán vị khách, ví dụ `[5, 2, 8, 1, ...]`. Decoder
+phải cắt hoán vị đó thành các tuyến, mỗi tuyến là một xe. Bài báo không nói cách cắt.
+
+**Vấn đề của cách cắt đơn giản nhất.** Cách đơn giản nhất là đi dọc hoán vị, cộng dồn hàng, xe đầy
+thì mở xe mới (`split_rule: capacity`). Với Solomon, mỗi khách chỉ cần 10–40 kg trong khi xe chở được
+400 kg, nên **hoán vị nào cũng ra cùng một số xe**. Thử 200 hoán vị ngẫu nhiên: C102-25 luôn ra 2 xe,
+R201-25 luôn ra 1 xe, C102-100 luôn ra 5 xe. Thuật toán chỉ đổi được thứ tự ghé, không bao giờ thử
+được phương án "thêm một xe để kịp giờ". Hai xe phục vụ 25 khách C102 (mỗi khách mất 90 phút dỡ
+hàng) thì đến muộn hàng nghìn phút là không tránh được.
+
+**Cách nhóm chọn: `split_rule: capacity_time` (mặc định).** Đi dọc hoán vị, mở xe mới khi:
+
+1. thêm khách tiếp theo sẽ làm xe vượt tải. Điều kiện này luôn bắt buộc, vì tải trọng là ràng buộc
+   cứng; hoặc
+2. xe sẽ đến khách tiếp theo **sau LT** (hết khung chấp nhận được), **và** đội xe vẫn còn xe trống.
+
+Khi cắt, xe mới xuất phát từ kho lúc kho mở cửa.
+
+**Vì sao mốc là LT chứ không phải LTb.** `[ET, LT]` theo định nghĩa là giới hạn chấp nhận được. Nếu
+cắt theo LTb thì xe không bao giờ đến muộn, và mất đánh đổi "muộn một chút để đỡ tốn một xe". Thử
+nghiệm cho thấy cắt theo LT dùng ít xe hơn, chi phí thấp hơn, mức hài lòng tương đương.
+
+**Hiệu quả.** Cùng một hoán vị ngẫu nhiên trên C102-25 (seed 0):
+
+| | Số xe | f1 (chi phí) | f2 (khí thải) | f3 (hài lòng) | Phút đến muộn |
+|---|---|---|---|---|---|
+| `capacity` | 2 | 25658 | 355 | 0.12 | 22914 |
+| `capacity_time` | 11 | 5022 | 515 | 0.36 | 0 |
+
+Thêm xe làm chi phí giảm 5 lần và hài lòng tăng gấp 3, vì mỗi xe chỉ tốn 100 CNY trong khi phạt
+muộn là 60 CNY mỗi giờ. Đổi lại, khí thải tăng vì nhiều xe đi nhiều km hơn. Đây là đánh đổi giữa các
+mục tiêu mà cách cắt cũ không bao giờ thấy được.
+
+**Lưu ý khi sửa code.** Hàm `split_capacity_time` tự tính giờ đến để quyết định chỗ cắt. Cách tính
+phải **giống hệt** `evaluate_routes_detail` (chờ tới đầu khung kỳ vọng, cộng thời gian dỡ hàng). Sửa
+cách tính giờ ở một chỗ thì phải sửa cả chỗ kia.
+
+`capacity` vẫn giữ lại để đưa vào báo cáo như một phép so sánh.
+
+### Thời điểm tính mức hài lòng (`satisfaction_time`), chốt 12/11
+
+**Bối cảnh.** Xe đến sớm thì đứng chờ tới đầu khung kỳ vọng rồi mới dỡ hàng, và thời gian chờ bị phạt
+ở F4. Câu hỏi là mức hài lòng W của khách tính tại lúc xe **đến**, hay lúc **bắt đầu dỡ hàng**. Bài
+báo không nói rõ.
+
+| | `arrival` (mặc định) | `service_start` |
+|---|---|---|
+| W tính tại | giờ xe đến | giờ bắt đầu dỡ hàng = max(giờ đến, ETa) |
+| Đến sớm bị trừ hài lòng? | có | không |
+| Đến sớm bị phạt ở | F4 và f3 | chỉ F4 |
+| Cách hiểu | khách khó chịu khi xe tới sớm, đỗ chờ trước cửa | khách chỉ quan tâm lúc nhận hàng |
+
+Hai cách cho cùng tuyến, cùng giờ đến, cùng f1 và f2. **Chỉ f3 khác.** Ví dụ khách 17 trong Table 11:
+xe đến lúc 6:13, khung giờ 8:00–12:00, chờ 107 phút. Theo `arrival` thì W = 0; theo `service_start`
+thì W = 100. Trên ba lời giải mẫu của bài báo:
+
+| | f3 theo `arrival` | f3 theo `service_start` |
+|---|---|---|
+| Table 11 | 0.8276 | 1.0000 |
+| Table 12 | 0.7586 | 1.0000 |
+| Table 13 | 0.7931 | 1.0000 |
+
+**Vì sao làm cả hai.** Mỗi cách có một rủi ro:
+
+- `arrival` tính việc đến sớm hai lần: một lần là chi phí chờ của công ty (F4), một lần là sự không
+  hài lòng của khách (f3).
+- `service_start` làm f3 chỉ còn đo việc đến muộn. Trên case thực tế, f3 có thể gần như luôn bằng 1.0.
+  Cộng với việc f2 tỉ lệ thuận với quãng đường (lỗi số 2 ở trên), bài toán ba mục tiêu gần như chỉ còn
+  một chiều.
+
+Giai đoạn 1 chạy NSGA-II baseline với cả hai giá trị, so front Pareto và hệ số tương quan giữa ba mục
+tiêu, rồi đưa kết quả vào báo cáo. **Kết quả hai cách phải lưu ở hai thư mục riêng**, không trộn.
+
+### Những điểm mô hình chưa xử lý
+
+- **Số xe tối đa** (`fleet_size`) mới chỉ được báo ra qua `fleet_ok`, chưa bị phạt hay chặn. Solomon
+  100 khách vẫn cần 26–27 xe, vượt giới hạn 25 xe. Lý do: với v = 40 km/h, một đơn vị toạ độ Solomon
+  mất 1.5 phút thay vì 1 phút như thiết kế gốc, và nhóm C1 có thời gian dỡ hàng 90 phút mỗi khách.
+- **Giờ đóng cửa kho** chưa được mô hình hoá: xe về kho muộn không bị phạt. Với case thực tế thì chưa
+  ảnh hưởng (các lời giải mẫu đều về trước 12:00).
+- **Case thực tế** chưa có giới hạn số xe (`case29.fleet_size: null`).
 
 ## Bốn cải tiến
 
