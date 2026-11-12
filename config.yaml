@@ -1,38 +1,50 @@
-# Moi tham so cua project. Khong hardcode so nao trong code.
-# Don vi noi bo: phut, kg, km (xem CLAUDE.md muc 4.2).
+# Mọi tham số của project nằm ở đây. Không viết cứng số nào trong code.
+# Đơn vị bên trong code: phút, kg, km. Dữ liệu đầu vào được đổi về các đơn vị này
+# một lần duy nhất trong src/instance.py.
+# Lý do của từng lựa chọn: xem README, mục "Chỉnh sửa bài báo và giả định của nhóm".
 
 # ---------------------------------------------------------------------------
-# Tham so bai toan, Table 2 cua bai bao
+# Tham số bài toán, lấy từ Table 2 của bài báo
 # ---------------------------------------------------------------------------
 cost:
-  sigma1: 10          # CNY/L, gia nhien lieu
-  sigma2: 100         # CNY/xe, chi phi co dinh moi xe
-  sigma3: 2           # CNY/km, chi phi theo quang duong
-  rho0: 0.122         # L/km, suat tieu thu khi xe rong
-  rho_star: 0.388     # L/km, suat tieu thu khi xe day
-  alpha: 20           # CNY/h, phat den som (decoder chia thoi gian phut cho 60)
-  beta: 60            # CNY/h, phat den muon (decoder chia thoi gian phut cho 60)
+  sigma1: 10          # CNY/lít, giá nhiên liệu (F1)
+  sigma2: 100         # CNY/xe, chi phí cố định mỗi xe xuất phát (F2)
+  sigma3: 2           # CNY/km, chi phí theo quãng đường (F3)
+  rho0: 0.122         # lít/km, suất tiêu thụ khi xe rỗng (F1)
+  rho_star: 0.388     # lít/km, suất tiêu thụ khi xe chở đầy (F1)
+  alpha: 20           # CNY/giờ, phạt đến sớm (F4). Decoder đổi số phút ra giờ trước khi nhân
+  beta: 60            # CNY/giờ, phạt đến muộn (F4). Decoder đổi số phút ra giờ trước khi nhân
 
-speed_kmh: 40         # van toc hang so moi cung
+speed_kmh: 40         # km/giờ, vận tốc cố định trên mọi cung đường
 
-# Mo hinh phat thai MEET, CLAUDE.md muc 2 va 3.1
-#   phi(v) = c0 + c1*v**3 + c2/v                     [g/km]
-#   psi(v) = d0 + d1*v + d2*v**2 + d3/v              (v**2, KHONG phai v**3)
+# Thời điểm dùng để tính mức hài lòng W của mỗi khách. Hai cách chỉ khác nhau ở f3.
+#   arrival       : tính theo giờ xe đến. Đến sớm bị trừ hài lòng (và bị phạt chờ ở F4)
+#   service_start : tính theo giờ bắt đầu dỡ hàng = max(giờ đến, ETa).
+#                   Đến sớm không bị trừ hài lòng, chỉ bị phạt chờ ở F4
+satisfaction_time: arrival
+
+# Mô hình khí thải MEET, dùng cho f2:
+#   phi(v) = c0 + c1*v**3 + c2/v           [g/km]
+#   psi(v) = d0 + d1*v + d2*v**2 + d3/v    hệ số hiệu chỉnh
+# Bài báo in số hạng d2 đi với v**3, làm psi âm. Nhóm sửa thành v**2.
+# Với v = 40: phi * psi = 679.44 g CO2 mỗi km.
 emission:
   phi: {c0: 110, c1: 0.000375, c2: 8702}
   psi: {d0: 1.27, d1: 0.0614, d2: -0.0011, d3: -1.33235}
-  grams_per_kg: 1000  # he so /1000 trong f2: doi gam sang kg
+  grams_per_kg: 1000  # đổi gam sang kg trong f2
 
 # ---------------------------------------------------------------------------
-# Du lieu
+# Dữ liệu
 # ---------------------------------------------------------------------------
 solomon:
   dir: data/solomon
-  capacity_kg: 400            # CLAUDE.md muc 3.4, kiem tra lai o giai doan 1
-  fleet_size: 25              # theo file Solomon, dung de kiem tra C5
-  tw_slack_min: 30            # khung quy dinh = khung goc noi 30 phut moi dau, clamp duoi ve 0
-  depart: depot_open          # xe roi kho tai ET[0], CLAUDE.md muc 4.3
-  instances:                  # 9 cau hinh theo bai bao
+  capacity_kg: 400            # tải trọng xe theo bài báo. Sẽ kiểm tra lại ở giai đoạn 1
+                              # (capacity gốc của Solomon khác: C1 là 200, R2/RC2 là 1000)
+  fleet_size: 25              # số xe tối đa, theo file Solomon (ràng buộc C5)
+  tw_slack_min: 30            # khung chấp nhận được = khung trong file nới 30 phút mỗi đầu,
+                              # đầu dưới không nhỏ hơn 0
+  depart: depot_open          # xe rời kho lúc kho mở cửa (phút 0)
+  instances:                  # 9 cấu hình theo đúng bài báo
     - {name: C102,  n: 25}
     - {name: R201,  n: 25}
     - {name: RC202, n: 25}
@@ -41,42 +53,46 @@ solomon:
     - {name: RC202, n: 50}
     - {name: C102,  n: 100}
     - {name: R201,  n: 100}
-    - {name: RC201, n: 100}
+    - {name: RC201, n: 100}   # ở mức 100 khách bài báo dùng RC201, không phải RC202
 
 case29:
   file: data/paper/case29.csv
-  capacity_kg: 4000
-  fleet_size: null            # CHUA CHOT: bai bao dung 9-10 xe, khong ghi gioi han doi xe
-  ton_to_kg: 1000             # demand trong CSV tinh bang tan
-  hour_to_min: 60             # khung gio trong CSV tinh bang gio
-  expected_window: same_as_specified   # CLAUDE.md muc 4.4
-  depart: depot_open          # 6:00, CLAUDE.md muc 4.3
+  capacity_kg: 4000           # tải trọng xe 4 tấn
+  fleet_size: null            # CHƯA CHỐT. Bài báo dùng 9-10 xe nhưng không ghi giới hạn.
+                              # null = không giới hạn số xe
+  ton_to_kg: 1000             # demand trong CSV tính bằng tấn
+  hour_to_min: 60             # khung giờ trong CSV tính bằng giờ
+  expected_window: same_as_specified   # bài báo chỉ cho một khung giờ mỗi khách,
+                                       # dùng nó cho cả khung kỳ vọng và khung chấp nhận được
+  depart: depot_open          # xe rời kho lúc kho mở cửa (6:00)
 
 # ---------------------------------------------------------------------------
-# Thuat toan
+# Thuật toán
 # ---------------------------------------------------------------------------
 nsga2:
-  n_pop: 80
-  n_gen: 200
-  pc: 0.7
-  pm:
+  n_pop: 80                   # kích thước quần thể
+  n_gen: 200                  # số thế hệ
+  pc: 0.7                     # xác suất lai ghép
+  pm:                         # xác suất đột biến
     solomon: 0.1
     case29: 0.2
 
 experiment:
   n_runs: 10
-  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]   # cung bo seed cho moi cau hinh
+  seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]   # mọi cấu hình dùng cùng bộ seed để so sánh công bằng
   results_dir: results
 
-# Bon cai tien. Mac dinh TAT. Tat het phai ra dung baseline voi cung seed.
+# Bốn cải tiến, mặc định TẮT.
+# Tắt hết thì phải ra đúng kết quả NSGA-II gốc với cùng seed.
 improvements:
-  init_smart: false
-  local_search: false
-  diversity: false
-  dp_split: false
+  init_smart: false           # khởi tạo quần thể thông minh
+  local_search: false         # 2-opt và Or-opt sau đột biến
+  diversity: false            # SDE / kNN density và external archive
+  dp_split: false             # split tối ưu bằng quy hoạch động, Pc/Pm thích nghi
 
 # ---------------------------------------------------------------------------
-# Chi so danh gia
+# Chỉ số đánh giá
 # ---------------------------------------------------------------------------
 metrics:
-  hv_ref_point: [1.1, 1.1, 1.1]   # sau khi chuan hoa min-max theo reference set
+  hv_ref_point: [1.1, 1.1, 1.1]   # điểm tham chiếu HV, sau khi chuẩn hoá ba mục tiêu
+                                  # về [0, 1] theo min-max của reference set

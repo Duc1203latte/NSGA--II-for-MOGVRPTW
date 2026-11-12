@@ -10,6 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
+SATISFACTION_TIMES = ("arrival", "service_start")
 
 @dataclass
 class Instance:
@@ -44,10 +45,14 @@ def load_instance(name: str, n: int) -> Instance:
     return inst
 
 def _model_params(cfg: dict) -> dict:
+    sat_time = cfg["satisfaction_time"]
+    if sat_time not in SATISFACTION_TIMES:
+        raise ValueError(f"satisfaction_time = {sat_time!r}, chỉ nhận {SATISFACTION_TIMES}")
     return {
         "cost": cfg["cost"],
         "speed_kmh": cfg["speed_kmh"],
         "emission": cfg["emission"],
+        "satisfaction_time": sat_time,
     }
 
 def _depart_time(mode: str, tw_expected: np.ndarray) -> float:

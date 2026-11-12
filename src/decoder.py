@@ -60,6 +60,7 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
     _check_routes(routes, inst)
     cost = inst.params["cost"]
     v = inst.params["speed_kmh"]
+    sat_at_arrival = inst.params["satisfaction_time"] == "arrival"
     fuel_slope = (cost["rho_star"] - cost["rho0"]) / inst.capacity  # L/km trên mỗi kg hàng
 
     fuel_l = 0.0       # tổng lít nhiên liệu, dùng cho F1
@@ -89,9 +90,13 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
 
             early_min += max(eta - arrive, 0.0)
             late_min += max(arrive - ltb, 0.0)
-            sat_sum += satisfaction(arrive, et, eta, ltb, lt)  # W tính theo GIỜ ĐẾN (mục 4.1)
+            #sat_sum += satisfaction(arrive, et, eta, ltb, lt)  # W tính theo GIỜ ĐẾN (mục 4.1)
 
-            t = max(arrive, eta) + inst.service_time[c]         # đến sớm thì chờ tới ETa rồi mới dỡ hàng
+            #t = max(arrive, eta) + inst.service_time[c]         # đến sớm thì chờ tới ETa rồi mới dỡ hàng
+            start = max(arrive, eta)
+            t_sat = arrive if sat_at_arrival else start
+            sat_sum += satisfaction(t_sat, et, eta, ltb, lt)
+            t = start + inst.service_time[c]
             load -= inst.demand[c]
             prev = c
 
@@ -117,6 +122,7 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
         "route_loads": route_loads,
         "arrival_times": arrival,
         "n_vehicles": len(routes),
+        "satisfaction_time": inst.params["satisfaction_time"],
         "fleet_ok": inst.fleet_size is None or len(routes) <= inst.fleet_size,  # ràng buộc C5
         "total_km": total_km,
         "early_min": early_min,

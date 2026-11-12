@@ -70,6 +70,8 @@ Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, l�
 - [ ] `src/runner.py`: chạy 10 seed trên một cấu hình, lưu kết quả thô vào `results/`
 - [ ] Gõ số liệu so sánh của bài báo vào `data/paper/paper_metrics.csv`, `data/paper/paper_objectives.csv`
 - [ ] Đo hệ số tương quan giữa f1, f2, f3 trên front của baseline
+- [ ] Chạy baseline với cả hai cách tính hài lòng (`satisfaction_time: arrival` và `service_start`),
+      lưu kết quả tách thư mục, so front và hệ số tương quan của hai cách
 - [ ] Bàn giao: chốt interface, viết hướng dẫn ngắn cách thêm một cải tiến (cờ trong config, chỗ gắn
       vào vòng lặp)
 
@@ -336,7 +338,8 @@ vào báo cáo.
 | Khoảng cách | Euclid trên toạ độ gốc, không làm tròn |
 | Thời gian chạy giữa hai điểm | khoảng cách chia vận tốc 40 km/h, đổi ra phút |
 | Phạt sớm/muộn | hệ số tính theo CNY/giờ, nên số phút sớm hoặc muộn phải chia 60 |
-| Xe đến sớm | xe chờ đến đầu khung kỳ vọng rồi mới phục vụ. Mức hài lòng tính theo giờ đến |
+| Xe đến sớm | xe chờ đến đầu khung kỳ vọng rồi mới phục vụ, thời gian chờ bị phạt ở F4 |
+| Thời điểm tính mức hài lòng | làm cả hai cách, chọn bằng khoá `satisfaction_time` trong config: `arrival` tính theo giờ đến (mặc định), `service_start` tính theo giờ bắt đầu phục vụ. Hai cách chỉ khác nhau ở f3 |
 | Giờ xe rời kho | lúc kho mở cửa: phút 0 với Solomon, 6:00 với case thực tế |
 | Hai khung giờ cho Solomon | khung trong file là khung kỳ vọng. Khung chấp nhận được là khung đó nới thêm 30 phút mỗi đầu, không xuống dưới 0 |
 | Hai khung giờ cho case thực tế | bài báo chỉ cho một khung, nhóm dùng nó cho cả hai. Giao trong khung thì hài lòng 100%, ngoài khung thì 0% |
