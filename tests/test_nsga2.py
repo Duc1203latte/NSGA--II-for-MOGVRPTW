@@ -3,20 +3,15 @@
 Chạy: pytest tests/test_nsga2.py -v
 """
 import copy
-
 import numpy as np
 import pytest
-
 from src.instance import load_config, load_instance
 from src.nsga2 import (
     crowding_distance, domination_matrix, environmental_selection, inversion, mutate,
-    non_dominated_sort, obx, obx_with_mask, ox, run, swap,
-)
-
+    non_dominated_sort, obx, obx_with_mask, ox, run, select_survivors, split_duplicates, swap,)
 
 def is_permutation(x, n) -> bool:
     return sorted(np.asarray(x).tolist()) == list(range(1, n + 1))
-
 
 # =========================================================================== trội và sắp xếp
 
@@ -60,6 +55,25 @@ def test_environmental_selection_keeps_best_front():
     keep = environmental_selection(F, np.zeros(5), 3)
     assert {0, 1} <= set(keep.tolist()) and len(keep) == 3
 
+# =========================================================================== loại cá thể trùng
+
+def test_split_duplicates():
+    pop = [np.array([1, 2, 3]), np.array([2, 1, 3]), np.array([1, 2, 3]), np.array([1, 2, 3])]
+    first, dup = split_duplicates(pop)
+    assert first.tolist() == [0, 1] and dup.tolist() == [2, 3]
+
+def test_select_survivors_prefers_distinct_permutations():
+    # Cá thể 2 là bản sao của cá thể 0 (cùng hoán vị, cùng mục tiêu, cùng tốt nhất)
+    pop = [np.array([1, 2, 3]), np.array([2, 1, 3]), np.array([1, 2, 3]), np.array([3, 2, 1])]
+    F = np.array([[1, 1, 0], [2, 2, 0], [1, 1, 0], [3, 3, 0]], dtype=float)
+    CV = np.zeros(4)
+    assert sorted(select_survivors(pop, F, CV, 2, True).tolist()) == [0, 1]
+    assert sorted(select_survivors(pop, F, CV, 2, False).tolist()) == [0, 2]   # không loại thì giữ cả bản sao
+
+def test_select_survivors_fills_with_duplicates_when_needed():
+    pop = [np.array([1, 2, 3])] * 3
+    F = np.ones((3, 3))
+    assert select_survivors(pop, F, np.zeros(3), 2, True).tolist() == [0, 1]
 
 # =========================================================================== toán tử
 
@@ -126,6 +140,7 @@ def test_run_output_is_valid_and_improves():
     res = run(inst, small_config(), seed=0)
     assert len(res["pop"]) == 20
     assert all(is_permutation(x, 25) for x in res["pop"])
+    assert len({tuple(x) for x in res["pop"]}) == 20          # bật loại trùng: không có bản sao
     assert res["n_evals"] == 20 * (15 + 1)
     assert len(res["history"]) == 15 + 1
     # chi phí nhỏ nhất trên front cuối không tệ hơn thế hệ đầu (elitism)

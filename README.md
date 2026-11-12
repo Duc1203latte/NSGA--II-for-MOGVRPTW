@@ -68,12 +68,12 @@ Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, l�
       test bất biến (mỗi khách đúng một lần, không vượt tải)
 - [ ] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
 - [x] Chốt tải trọng Solomon 400 kg và cách cắt tuyến `capacity_time` (12/11)
-- [ ] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
+- [x] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
       vòng lặp chính. Chỉ dùng một bộ sinh ngẫu nhiên có seed
-- [ ] `tests/test_nsga2.py`: test sắp xếp không trội, crowding distance, toán tử, cùng seed ra cùng
+- [x] `tests/test_nsga2.py`: test sắp xếp không trội, crowding distance, toán tử, cùng seed ra cùng
       kết quả
 - [ ] So sánh toán tử (OX/OBX, `standard`/`always`) trên 3 instance × 10 seed, chốt mặc định
-- [ ] `src/metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
+- [ ] `src/metrics.py` và `tests/test_metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
 - [ ] `src/runner.py`: chạy 10 seed trên một cấu hình, lưu kết quả thô vào `results/`
 - [ ] Gõ số liệu so sánh của bài báo vào `data/paper/paper_metrics.csv`, `data/paper/paper_objectives.csv`
 - [ ] Đo hệ số tương quan giữa f1, f2, f3 trên front của baseline
@@ -458,6 +458,7 @@ không theo bài báo. Chỗ nào chưa chắc thì để chọn được trong 
 | Đột biến | `mutation: standard`: với xác suất pm, inversion hoặc swap 50/50. `always` để so | inversion ba điểm hoặc swap | inversion giống một bước 2-opt, chỉ phá 2 cạnh; swap phá 4 cạnh |
 | Số xe tối đa | constrained domination: lời giải vượt ít xe hơn luôn thắng; vượt bằng nhau thì so Pareto | ràng buộc cứng (23) | cách xử lý ràng buộc chuẩn của NSGA-II, không cần chọn hệ số phạt |
 | Chọn lọc môi trường | gộp cha mẹ và con, lấy theo front, front cuối lấy theo crowding | | NSGA-II chuẩn |
+| Loại cá thể trùng | `eliminate_duplicates: true`: khi chọn cá thể sống sót, mỗi hoán vị chỉ giữ một bản; bản sao chỉ dùng để lấp chỗ khi không đủ hoán vị khác nhau | | thí nghiệm bên dưới |
 | Ngẫu nhiên | một bộ sinh `np.random.default_rng(seed)` cho mọi thứ | | cùng seed ra đúng cùng kết quả |
 
 **Về hai chỗ bài báo viết không rõ ở phần đột biến:**
@@ -475,7 +476,76 @@ không theo bài báo. Chỗ nào chưa chắc thì để chọn được trong 
 | case29 | 2 giây | 2834 → 2375 | 288.5 → 219.3 | 0.759 → 0.862 |
 | C102-100 | 6 giây | 67073 → 16857 | 2835.7 → 1952.9 | 0.343 → 0.605 |
 
-Đây mới là một seed, chưa phải kết quả để báo cáo.
+Đây mới là một seed, chưa phải kết quả để báo cáo. Bảng này chạy trước khi thêm bước loại cá thể trùng.
+
+### Thí nghiệm: có nên loại cá thể trùng không (12/11)
+
+**Vấn đề.** NSGA-II gốc không loại cá thể trùng. Một lời giải tốt được chọn lặp lại nhiều lần, các bản
+sao chiếm dần quần thể. Đếm ở thế hệ cuối (seed 0): C102-25 chỉ có 18/80 hoán vị khác nhau, case29
+13/80, R201-50 24/80. Quần thể thật chỉ còn khoảng 15–25 cá thể.
+
+**Thí nghiệm.** So `eliminate_duplicates: false` và `true`, 3 instance × 10 seed (0–9), cùng bộ seed,
+cấu hình mặc định còn lại. Reference set và cận chuẩn hoá lấy chung từ cả hai cấu hình. p-value là
+Wilcoxon rank-sum trên 10 giá trị HV.
+
+| Instance | HV không loại | HV loại trùng | p | SC(loại, không loại) | SC(không loại, loại) |
+|---|---|---|---|---|---|
+| C102-25 | 0.261 ± 0.142 | **0.720 ± 0.273** | **0.0007** | 0.900 | 0.094 |
+| R201-50 | 0.671 ± 0.226 | 0.702 ± 0.175 | 0.71 | 0.434 | 0.376 |
+| case29 | 0.744 ± 0.193 | 0.791 ± 0.205 | 0.65 | 0.571 | 0.293 |
+
+**Kết luận.** Loại cá thể trùng tốt hơn rõ rệt trên C102-25 (HV gần gấp 3, có ý nghĩa thống kê, và phủ
+90% front của bản không loại). Trên R201-50 và case29, trung bình tốt hơn nhưng chưa có ý nghĩa thống
+kê. Không instance nào tệ đi. **Chốt: bật `eliminate_duplicates: true` trong baseline.**
+
+**Ghi chú phụ từ thí nghiệm:**
+
+- HV trung bình vẫn còn tăng từ thế hệ 150 đến 200 trên cả ba instance, tức là 200 thế hệ chưa hội tụ
+  hẳn.
+- Front cuối chỉ có khoảng 10–20 điểm khác nhau, dù quần thể có 80 cá thể.
+
+## Chỉ số đánh giá
+
+Code ở `src/metrics.py`, test ở `tests/test_metrics.py`. Mọi tập điểm là mục tiêu cực tiểu
+(f1, f2, 1 - f3), đúng như `nsga2.run` trả về.
+
+| Chỉ số | Ý nghĩa | Tốt khi | Cách tính |
+|---|---|---|---|
+| HV (hypervolume) | thể tích vùng bị front trội, tính tới điểm tham chiếu | lớn, tối đa 1.1³ = 1.331 | pymoo, trên mục tiêu đã chuẩn hoá, điểm tham chiếu (1.1, 1.1, 1.1) |
+| IGD | khoảng cách trung bình từ mỗi điểm của reference set tới điểm gần nhất của front | nhỏ | pymoo, trên mục tiêu đã chuẩn hoá |
+| SP (spacing) | độ lệch chuẩn của khoảng cách từ mỗi điểm tới điểm gần nó nhất, công thức (29) của bài báo | nhỏ (đều) | tự viết, trên mục tiêu đã chuẩn hoá |
+| SC(A, B) (set coverage) | tỉ lệ điểm của B bị ít nhất một điểm của A trội, công thức (31) | SC(A, B) lớn hơn SC(B, A) thì A tốt hơn | tự viết, không cần chuẩn hoá |
+| DM | căn của tổng bình phương độ trải từng mục tiêu, chia cho độ trải của mọi điểm, công thức (32) | lớn (trải rộng), tối đa √3 | tự viết |
+
+**Vì sao HV và IGD dùng pymoo.** HV trong không gian 3 chiều rất dễ viết sai, và sai thì vẫn ra một
+con số trông hợp lý, trong khi toàn bộ phần so sánh của báo cáo dựa trên nó.
+
+**Reference set.** Gộp front cuối của **mọi cấu hình và mọi run** trên cùng một instance, rồi lọc lấy
+phần không bị trội. Phải gộp cả baseline chứ không chỉ bản tốt nhất, nếu không IGD của bản tốt nhất gần
+bằng 0 và vô nghĩa. Hệ quả: **thêm cấu hình mới thì phải tính lại chỉ số của mọi cấu hình cũ**, vì
+reference set đổi. Vì vậy runner lưu front thô, còn chỉ số được tính sau cùng.
+
+**Chuẩn hoá.** Mỗi mục tiêu được đưa về [0, 1] theo min và max của **mọi điểm trong mọi front** (mọi
+cấu hình, mọi run trên cùng instance), không chỉ reference set. Không chuẩn hoá thì f1 (cỡ vài nghìn)
+lấn át hẳn f3 (nhỏ hơn 1) trong mọi phép tính khoảng cách và thể tích.
+
+Lúc đầu nhóm chuẩn hoá theo min-max của reference set, nhưng bỏ cách đó vì hai lỗi thấy trong thí
+nghiệm loại cá thể trùng:
+
+- Reference set chỉ gồm điểm tốt nhất nên nằm trong một vùng hẹp. Front của cấu hình kém hơn nằm hẳn
+  ngoài vùng đó, sau chuẩn hoá vượt điểm tham chiếu 1.1, nên HV = 0. C102-25 không loại trùng ra HV = 0
+  ở cả 10 run, nên không so được gì.
+- DM vượt √3 (lên tới 2.17), trái với định nghĩa. Công thức (32) của bài báo chuẩn hoá theo cực trị của
+  mọi lời giải của mọi thuật toán, đúng như cách nhóm dùng bây giờ.
+
+HV của các thế hệ đầu vẫn có thể bằng 0 vì front lúc đó nằm ngoài cận chuẩn hoá. Đường hội tụ HV vì
+vậy bắt đầu từ 0, và điều này là bình thường.
+
+**Front được làm sạch trước khi tính:** bỏ các điểm trùng nhau và các điểm bị trội. Điểm trùng làm SP
+sai, vì khoảng cách tới điểm gần nhất bằng 0.
+
+**Không so số HV với bài báo.** Bài báo không ghi cách chuẩn hoá và điểm tham chiếu của họ, nên số HV
+hai bên không so trực tiếp được. Chỉ so thứ hạng giữa các cấu hình của nhóm.
 
 ## Bốn cải tiến
 

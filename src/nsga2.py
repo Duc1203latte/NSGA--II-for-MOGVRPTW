@@ -61,6 +61,28 @@ def rank_and_crowding(F: np.ndarray, CV: np.ndarray) -> tuple[np.ndarray, np.nda
         crowd[idx] = crowding_distance(F[idx])
     return rank, crowd
 
+def split_duplicates(pop: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    """Chia chỉ số quần thể thành bản gốc (lần đầu gặp) và bản sao (hoán vị đã gặp trước đó)"""
+    seen: set[bytes] = set()
+    first, dup = [], []
+    for i, perm in enumerate(pop):
+        key = perm.tobytes()
+        (dup if key in seen else first).append(i)
+        seen.add(key)
+    return np.array(first, dtype=int), np.array(dup, dtype=int)
+
+
+def select_survivors(pop: list[np.ndarray], F: np.ndarray, CV: np.ndarray,
+                     n_keep: int, eliminate_duplicates: bool) -> np.ndarray:
+    """Chọn n_keep cá thể sống sót. Nếu loại trùng: chỉ chọn trong các hoán vị khác nhau,
+    bản sao chỉ dùng để lấp chỗ khi không đủ hoán vị khác nhau"""
+    if not eliminate_duplicates:
+        return environmental_selection(F, CV, n_keep)
+    first, dup = split_duplicates(pop)
+    if len(first) >= n_keep:
+        return first[environmental_selection(F[first], CV[first], n_keep)]
+    return np.concatenate([first, dup[: n_keep - len(first)]])
+
 def environmental_selection(F: np.ndarray, CV: np.ndarray, n_keep: int) -> np.ndarray:
     rank, crowd = rank_and_crowding(F, CV)
     chosen: list[int] = []
@@ -127,7 +149,6 @@ def mutation_rate(inst: Instance, cfg: dict) -> float:
     pm = cfg["nsga2"]["pm"]
     return pm["case29"] if inst.name.startswith("case29") else pm["solomon"]
 
-
 def make_offspring(pop: list[np.ndarray], rank: np.ndarray, crowd: np.ndarray,
                    cfg: dict, pm: float, rng: np.random.Generator) -> list[np.ndarray]:
     p = cfg["nsga2"]
@@ -145,14 +166,12 @@ def make_offspring(pop: list[np.ndarray], rank: np.ndarray, crowd: np.ndarray,
             children.append(c)
     return children[: len(pop)]
 
-
 def check_config(cfg: dict) -> None:
     p = cfg["nsga2"]
     if p["crossover"] not in CROSSOVERS:
         raise ValueError(f"crossover = {p['crossover']!r}, chỉ nhận {CROSSOVERS}")
     if p["mutation"] not in MUTATIONS:
         raise ValueError(f"mutation = {p['mutation']!r}, chỉ nhận {MUTATIONS}")
-
 
 def run(inst: Instance, cfg: dict, seed: int) -> dict:
     '''Chạy NSGA-II một lần'''
@@ -178,7 +197,7 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         merged = pop + children
         F_all = np.vstack([F, F_child])
         CV_all = np.concatenate([CV, CV_child])
-        keep = environmental_selection(F_all, CV_all, n_pop)
+        keep = select_survivors(merged, F_all, CV_all, n_pop, p["eliminate_duplicates"])
         pop = [merged[i] for i in keep]
         F, CV = F_all[keep], CV_all[keep]
 
