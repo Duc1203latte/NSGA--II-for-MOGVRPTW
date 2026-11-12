@@ -17,6 +17,10 @@ Bài báo là nguồn mô hình, tham số, dữ liệu và là mốc để so s
 thức sai và nhiều chỗ không nói rõ, nên nhóm không cố tái tạo đúng số của họ. Code được kiểm bằng test
 tính tay theo mô hình của nhóm. Chỗ nào số lệch bài báo thì ghi vào báo cáo kèm nguyên nhân.
 
+Nhóm cũng không bắt buộc dùng đúng phương pháp của bài báo (cách mã hoá, toán tử lai ghép, đột biến,
+chọn lọc...). Mỗi lựa chọn được quyết định bằng lý do hợp lý hoặc bằng thực nghiệm, cách nào cho kết
+quả tốt hơn thì dùng. Chỗ nào khác bài báo thì ghi rõ khác ở đâu và vì sao.
+
 ## Bài toán
 
 Một kho, một đội xe tải giống nhau, n khách. Mỗi khách có toạ độ, lượng hàng cần giao, thời gian dỡ
