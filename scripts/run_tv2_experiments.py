@@ -43,6 +43,10 @@ MAIN = {
     "init_only": {"flags": {"init_smart": True}},
     "ls_only": {"flags": {"local_search": True}},
     "both": {"flags": {"init_smart": True, "local_search": True}},
+    # biến thể được chọn từ tuning seed 100..104 (không phải giá trị mặc định trong config)
+    "ls_drift_eval": {"flags": {"local_search": True}, "ls": {"split_drift_policy": "evaluate_actual"}},
+    "both_drift_eval": {"flags": {"init_smart": True, "local_search": True},
+                        "ls": {"split_drift_policy": "evaluate_actual"}},
 }
 
 # Tuning một-tham-số-một-lần quanh giá trị mặc định, CHỈ trên seed tuning (100..104)

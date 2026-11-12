@@ -19,11 +19,14 @@ from pathlib import Path
 import numpy as np
 
 # Thứ tự cố định; màu đi theo cấu hình, không theo thứ hạng. Đã kiểm tra bằng validator CVD.
-ORDER = ["off", "init_only", "ls_only", "both"]
-COLORS = {"off": "#2a78d6", "init_only": "#eb6834", "ls_only": "#1baf7a", "both": "#eda100"}
-MARKERS = {"off": "o", "init_only": "s", "ls_only": "^", "both": "D"}   # mã hoá phụ (không chỉ màu)
+ORDER = ["off", "init_only", "ls_only", "both", "ls_drift_eval", "both_drift_eval"]
+COLORS = {"off": "#2a78d6", "init_only": "#eb6834", "ls_only": "#1baf7a", "both": "#eda100",
+          "ls_drift_eval": "#e87ba4", "both_drift_eval": "#008300"}
+MARKERS = {"off": "o", "init_only": "s", "ls_only": "^", "both": "D", "ls_drift_eval": "v",
+           "both_drift_eval": "P"}                                # mã hoá phụ (không chỉ màu)
 LABELS = {"off": "baseline", "init_only": "init_smart", "ls_only": "local_search",
-          "both": "init_smart + local_search"}
+          "both": "init_smart + local_search", "ls_drift_eval": "local_search (drift=eval)",
+          "both_drift_eval": "init + LS (drift=eval)"}
 EXTRA = ["#e87ba4", "#008300", "#7a5cd6", "#8a6d3b", "#555555"]
 
 REQ_RUNS = {"instance", "variant", "seed", "hv", "igd", "npz"}
