@@ -64,12 +64,15 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 
 Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, làm nền cho ba người làm cải tiến ở giai đoạn 2.
 
-- [ ] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
+- [x] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
       test bất biến (mỗi khách đúng một lần, không vượt tải)
 - [ ] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
 - [x] Chốt tải trọng Solomon 400 kg và cách cắt tuyến `capacity_time` (12/11)
 - [ ] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
       vòng lặp chính. Chỉ dùng một bộ sinh ngẫu nhiên có seed
+- [ ] `tests/test_nsga2.py`: test sắp xếp không trội, crowding distance, toán tử, cùng seed ra cùng
+      kết quả
+- [ ] So sánh toán tử (OX/OBX, `standard`/`always`) trên 3 instance × 10 seed, chốt mặc định
 - [ ] `src/metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
 - [ ] `src/runner.py`: chạy 10 seed trên một cấu hình, lưu kết quả thô vào `results/`
 - [ ] Gõ số liệu so sánh của bài báo vào `data/paper/paper_metrics.csv`, `data/paper/paper_objectives.csv`
@@ -431,12 +434,48 @@ tiêu, rồi đưa kết quả vào báo cáo. **Kết quả hai cách phải l�
 
 ### Những điểm mô hình chưa xử lý
 
-- **Số xe tối đa** (`fleet_size`) mới chỉ được báo ra qua `fleet_ok`, chưa bị phạt hay chặn. Solomon
-  100 khách vẫn cần 26–27 xe, vượt giới hạn 25 xe. Lý do: với v = 40 km/h, một đơn vị toạ độ Solomon
-  mất 1.5 phút thay vì 1 phút như thiết kế gốc, và nhóm C1 có thời gian dỡ hàng 90 phút mỗi khách.
+- **Số xe tối đa** (`fleet_size`): decoder chỉ báo ra qua `fleet_ok`. NSGA-II xử lý bằng constrained
+  domination (xem mục "NSGA-II baseline" bên dưới). Với hoán vị ngẫu nhiên, Solomon 100 khách thường
+  cần 26–27 xe, vượt giới hạn 25 xe, vì với v = 40 km/h một đơn vị toạ độ Solomon mất 1.5 phút thay vì
+  1 phút như thiết kế gốc, và nhóm C1 có thời gian dỡ hàng 90 phút mỗi khách. Sau 200 thế hệ, NSGA-II
+  tìm được lời giải không vượt 25 xe (chạy thử C102-100, seed 0).
 - **Giờ đóng cửa kho** chưa được mô hình hoá: xe về kho muộn không bị phạt. Với case thực tế thì chưa
   ảnh hưởng (các lời giải mẫu đều về trước 12:00).
 - **Case thực tế** chưa có giới hạn số xe (`case29.fleet_size: null`).
+
+## NSGA-II baseline
+
+Code ở `src/nsga2.py`, test ở `tests/test_nsga2.py`. Các lựa chọn dưới đây chọn theo lý do kỹ thuật,
+không theo bài báo. Chỗ nào chưa chắc thì để chọn được trong config và sẽ so bằng thực nghiệm.
+
+| Thành phần | Nhóm dùng | Bài báo | Lý do |
+|---|---|---|---|
+| Mã hoá | hoán vị khách, decoder cắt tuyến theo `split_rule` | hoán vị có số 0 làm dấu ngăn tuyến | lai ghép và đột biến đơn giản, luôn ra lời giải hợp lệ; số xe do decoder quyết định |
+| Mục tiêu bên trong | (f1, f2, 1 - f3), cả ba cực tiểu | | để so trội cùng một chiều |
+| Khởi tạo | hoán vị ngẫu nhiên | ngẫu nhiên | khởi tạo thông minh là cải tiến `init_smart` |
+| Chọn lọc cha mẹ | giải đấu `tournament_size` = 2: hạng thấp hơn thắng, cùng hạng thì crowding lớn hơn thắng | giống, không ghi kích thước | NSGA-II chuẩn |
+| Lai ghép | `crossover: ox` mặc định, `obx` để so | OBX | OX giữ nguyên một đoạn liền của cha 1, tức giữ được các cụm khách đi liền nhau. OBX giữ vị trí tuyệt đối, ít giữ cặp khách liền kề |
+| Đột biến | `mutation: standard`: với xác suất pm, inversion hoặc swap 50/50. `always` để so | inversion ba điểm hoặc swap | inversion giống một bước 2-opt, chỉ phá 2 cạnh; swap phá 4 cạnh |
+| Số xe tối đa | constrained domination: lời giải vượt ít xe hơn luôn thắng; vượt bằng nhau thì so Pareto | ràng buộc cứng (23) | cách xử lý ràng buộc chuẩn của NSGA-II, không cần chọn hệ số phạt |
+| Chọn lọc môi trường | gộp cha mẹ và con, lấy theo front, front cuối lấy theo crowding | | NSGA-II chuẩn |
+| Ngẫu nhiên | một bộ sinh `np.random.default_rng(seed)` cho mọi thứ | | cùng seed ra đúng cùng kết quả |
+
+**Về hai chỗ bài báo viết không rõ ở phần đột biến:**
+
+- Bài báo viết: mỗi cá thể bốc số ngẫu nhiên; nhỏ hơn Pm thì inversion, **lớn hơn hoặc bằng Pm thì
+  swap**. Đọc đúng chữ thì đứa con nào cũng bị đột biến. Đây là chế độ `mutation: always`.
+- "Inversion ba điểm" trong Hình 4a không khớp với phép đảo đoạn thông thường. Nhóm dùng phép đảo đoạn
+  thông thường ở cả hai chế độ.
+
+**Chạy thử** (200 thế hệ, 80 cá thể, seed 0, cấu hình mặc định):
+
+| Instance | Thời gian | f1 nhỏ nhất: thế hệ 0 → cuối | f2 nhỏ nhất | f3 lớn nhất |
+|---|---|---|---|---|
+| C102-25 | 2 giây | 3607 → 1707 | 409.7 → 240.9 | 0.543 → 0.952 |
+| case29 | 2 giây | 2834 → 2375 | 288.5 → 219.3 | 0.759 → 0.862 |
+| C102-100 | 6 giây | 67073 → 16857 | 2835.7 → 1952.9 | 0.343 → 0.605 |
+
+Đây mới là một seed, chưa phải kết quả để báo cáo.
 
 ## Bốn cải tiến
 
