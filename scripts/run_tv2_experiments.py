@@ -129,6 +129,13 @@ def analyze(out: Path, ref_point) -> None:
         ref = nondominated(np.vstack(list(fronts.values())))
         norm = Normalizer(ref)
         ref_n = norm(ref)
+        # Chỉ số PHỤ (không phải quy ước nhóm): nadir = max của mọi front cuối, để front nằm ngoài
+        # hộp của reference set vẫn có HV > 0 và so được.
+        wide = Normalizer(np.vstack([ref, np.vstack(list(fronts.values())).max(axis=0, keepdims=True)]))
+        # HV quần thể ban đầu: chuẩn hoá riêng theo hợp các front ban đầu (mọi variant, mọi seed)
+        init_fronts = {id(r): nondominated(data[id(r)]["init_F"]) for r in rs}
+        all_init = np.vstack(list(init_fronts.values()))
+        init_norm = Normalizer(np.vstack([nondominated(all_init), all_init.max(axis=0, keepdims=True)]))
         np.savetxt(out / f"refset_{inst_name}.csv", ref, delimiter=",", header="g1_f1,g2_f2,g3_1mf3")
         for r in rs:
             d = data[id(r)]
@@ -136,7 +143,9 @@ def analyze(out: Path, ref_point) -> None:
             init_front = nondominated(d["init_F"])
             r2 = dict(r)
             r2.update(hv=hypervolume(Fn, ref_point), igd=igd(Fn, ref_n), sp=spacing(Fn),
+                      hv_wide=hypervolume(wide(nondominated(fronts[id(r)])), ref_point),
                       init_hv=hypervolume(norm(init_front), ref_point),
+                      init_hv_own=hypervolume(init_norm(init_fronts[id(r)]), ref_point),
                       ref_lo=json.dumps(norm.lo.tolist()), ref_hi=json.dumps(norm.hi.tolist()))
             final_rows.append(r2)
             hg, hF, he = d["hist_gen"], d["hist_F"], d["hist_evals"]
@@ -161,7 +170,7 @@ def summarize(out: Path, rows: list[dict]) -> None:
     groups: dict[tuple[str, str], list[dict]] = {}
     for r in rows:
         groups.setdefault((r["instance"], r["variant"]), []).append(r)
-    metrics = ["hv", "igd", "sp", "init_hv", "n_pareto_unique", "n_evals", "elapsed_s",
+    metrics = ["hv", "hv_wide", "igd", "sp", "init_hv", "init_hv_own", "n_pareto_unique", "n_evals", "elapsed_s",
                "n_ls_accepted", "n_ls_candidate_evals", "n_ls_rejected_split", "fleet_viol_front",
                "n_gen_done"]
     summ = []
@@ -177,6 +186,13 @@ def summarize(out: Path, rows: list[dict]) -> None:
             a = np.array([float(r["hv"]) for r in rs])
             b = np.array([float(r["hv"]) for r in base])
             row["delta_hv"] = a.mean() - b.mean()
+            aw = np.array([float(r["hv_wide"]) for r in rs])
+            bw = np.array([float(r["hv_wide"]) for r in base])
+            row["delta_hv_wide"] = aw.mean() - bw.mean()
+            row["wins_hv_wide_vs_off"] = int((aw > bw).sum())
+            ai = np.array([float(r["igd"]) for r in rs])
+            bi = np.array([float(r["igd"]) for r in base])
+            row["wins_igd_vs_off"] = int((ai < bi).sum())
             row["wins_vs_off"] = int((a > b).sum())
             diff = a - b
             # chỉ để tham khảo; kiểm định chính thức của nhóm do TV3 thực hiện
@@ -188,12 +204,13 @@ def summarize(out: Path, rows: list[dict]) -> None:
         w = csv.DictWriter(f, keys)
         w.writeheader()
         w.writerows(summ)
-    print(f"{'instance':12s} {'variant':16s} {'HV mean±std':>18s} {'dHV':>8s} {'win':>4s} "
-          f"{'IGD':>8s} {'#eval':>8s} {'time s':>7s} {'LSacc':>7s}")
+    print(f"{'instance':12s} {'variant':16s} {'HV mean±std':>16s} {'win':>4s} {'HVwide':>15s} "
+          f"{'IGD mean±std':>16s} {'initHV':>7s} {'#eval':>7s} {'time s':>7s}")
     for r in summ:
-        print(f"{r['instance']:12s} {r['variant']:16s} {r['hv_mean']:9.4f}±{r['hv_std']:.4f} "
-              f"{r.get('delta_hv', 0):+8.4f} {r.get('wins_vs_off', ''):>4} {r['igd_mean']:8.4f} "
-              f"{r['n_evals_mean']:8.0f} {r['elapsed_s_mean']:7.1f} {r['n_ls_accepted_mean']:7.0f}")
+        print(f"{r['instance']:12s} {r['variant']:16s} {r['hv_mean']:.4f}±{r['hv_std']:.4f} "
+              f"{r.get('wins_vs_off', ''):>4} {r['hv_wide_mean']:.4f}±{r['hv_wide_std']:.4f} "
+              f"{r['igd_mean']:.4f}±{r['igd_std']:.4f} {r['init_hv_own_mean']:7.4f} "
+              f"{r['n_evals_mean']:7.0f} {r['elapsed_s_mean']:7.1f}")
 
 
 def main() -> int:

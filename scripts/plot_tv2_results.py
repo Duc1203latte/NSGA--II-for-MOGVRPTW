@@ -151,7 +151,7 @@ def plot_all(root: Path, run_dir: Path, fig_dir: Path, seed: int, fmts: list[str
                 ax.scatter(np.full(len(vals), k), vals, color=st[v][0], marker=st[v][1], s=16,
                            edgecolors="white", linewidths=0.5, zorder=3)
             ax.set_xticks(range(1, len(order) + 1))
-            ax.set_xticklabels([st[v][2].replace(" + ", "\n+ ") for v in order], fontsize=8)
+            ax.set_xticklabels([st[v][2] for v in order], fontsize=8, rotation=35, ha="right")
             ax.set_title(f"{metric.upper()} {arrow}", fontsize=10)
             _setup_ax(ax)
         fig.suptitle(f"{inst}: {n_seeds} seed mỗi cấu hình", fontsize=11)
