@@ -96,6 +96,27 @@ improvements:
   local_search: false         # 2-opt và Or-opt sau đột biến
   diversity: false            # SDE / kNN density và external archive
   dp_split: false             # split tối ưu bằng quy hoạch động, Pc/Pm thích nghi
+  # Tham số TV2 (chỉ đọc khi cờ tương ứng bật). Là điểm khởi đầu thí nghiệm, CHƯA tuning.
+  init_smart_params:
+    ratios: {nn: 0.2, tw: 0.2, random: 0.6}   # tỉ lệ nearest-neighbor / theo ETa / ngẫu nhiên
+    perturb_swaps_min: 1        # số lần hoán đổi 2 vị trí để tạo biến thể từ hoán vị NN/TW
+    perturb_swaps_max: 3
+    keep_pure_seed: true        # giữ 1 bản NN và 1 bản TW nguyên gốc (không xáo)
+    dedup_max_attempts: 50      # số lần thử lại khi sinh trùng, hết thì dùng random dự phòng
+  local_search_params:
+    p_ls: 0.2                   # xác suất chạy local search cho mỗi con sau đột biến
+    max_passes: 2               # số lượt duyệt các tuyến tối đa mỗi lần gọi
+    max_candidate_evals: 40     # trần cứng số lần đánh giá ứng viên mỗi lần gọi (gồm cả bị loại)
+    max_accepted_moves: 5       # số bước đi được nhận tối đa mỗi lần gọi
+    operators: [two_opt, or_opt]
+    or_opt_lengths: [1, 2, 3]
+    strategy: first             # first | best (best: thử mọi toán tử trên 1 tuyến rồi lấy tốt nhất)
+    acceptance: weighted        # weighted (tổng có trọng số đã chuẩn hoá) | pareto (trội nghiêm ngặt)
+    weight_distribution: dirichlet   # dirichlet (bốc 1 lần mỗi lần gọi) | equal (1/3, không dùng RNG)
+    improvement_epsilon: 1.0e-10
+    split_drift_policy: reject  # split lại hoán vị ghép ra bộ tuyến KHÁC bộ tuyến đề xuất:
+                                #   reject          : loại bước đi (an toàn, đúng nghĩa nội tuyến)
+                                #   evaluate_actual : vẫn so sánh bằng kết quả thật của decoder
 
 # ---------------------------------------------------------------------------
 # Chỉ số đánh giá
