@@ -66,7 +66,10 @@ def front_vehicles(res: dict, inst, cfg: dict) -> float:
     counts = []
     for i in res["front"]:
         perm = res["pop"][i]
-        d = evaluate_dp(perm, inst, res["W"][i], scales) if use_dp else evaluate_detail(perm, inst)
+        w = None if res.get("W") is None else res["W"][i]
+        # polish: hàng NaN được chấm bằng split baseline, hàng có trọng số được chấm bằng DP
+        dp_row = use_dp and w is not None and not np.isnan(w).any()
+        d = evaluate_dp(perm, inst, w, scales) if dp_row else evaluate_detail(perm, inst)
         if not np.array_equal(res["F"][i], [d["f1"], d["f2"], 1 - d["f3"]]):
             raise AssertionError(f"seed {res['seed']}: F chấm lại khác F đã lưu")
         counts.append(d["n_vehicles"])
@@ -114,7 +117,8 @@ def eq_budget_table(exp: str, inst_name: str, dp_cost_ratio: dict[str, float]) -
     return "\n".join(lines)
 
 
-def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = ()) -> list[dict]:
+def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
+                  order: list[str] | None = None) -> list[dict]:
     base_cfg = load_config()
     exp_dir = results_root(base_cfg) / exp / inst_name
     per_run = analyze_all(exp_dir, base_cfg["metrics"]["hv_ref_point"], exclude)
@@ -124,7 +128,10 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = ()) -> li
     base = per_run[per_run.config == "baseline"]
     eq = per_run[per_run.config == "baseline_eqtime"]
     rows = []
-    for config in [c for c in CONFIG_ORDER if c in set(per_run.config)]:
+    present = set(per_run.config)
+    cpu_csv = exp_dir.parent / "cpu_cost.csv"
+    cpu = pd.read_csv(cpu_csv) if cpu_csv.exists() else None
+    for config in [c for c in (order or CONFIG_ORDER) if c in present]:
         pr = per_run[per_run.config == config].sort_values("seed")
         with open(exp_dir / config / "config_used.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
@@ -141,8 +148,14 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = ()) -> li
             "feas_pop": f"{np.mean([r['feasible_frac_pop'] for r in runs]):.2f}",
             "vehicles": f"{np.mean([front_vehicles(r, inst, cfg) for r in runs]):.1f}",
             "front_size": f"{pr.n_points.mean():.1f}",
+            "n_dp_calls": f"{np.mean([r.get('n_dp_calls', 0) for r in runs]):.0f}",
+            "cpu_rel": "—",
             "dHV": "—", "p_HV": "—", "p_IGD": "—", "p_HV_eq": "—", "p_IGD_eq": "—",
         }
+        if cpu is not None:
+            m = cpu[(cpu.instance == inst_name) & (cpu.config == config)]
+            if len(m):
+                row["cpu_rel"] = f"{float(m.relative.iloc[0]):.2f}"
         if config != "baseline":
             row["dHV"] = f"{pr.HV.mean() - base.HV.mean():+.4f}"
             row["p_HV"] = pstr(ranksums(pr.HV, base.HV).pvalue)
@@ -162,10 +175,17 @@ COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("n_gen", "n_gen"),
         ("vehicles", "Số xe TB (front)"), ("front_size", "Số điểm front")]
 
 
-def to_markdown(rows: list[dict]) -> str:
-    head = "| " + " | ".join(h for _, h in COLS) + " |"
-    sep = "|" + "|".join("---" for _ in COLS) + "|"
-    body = ["| " + " | ".join(str(r[k]) for k, _ in COLS) + " |" for r in rows]
+TUNE_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("HV", "HV"), ("dHV", "ΔHV vs baseline"),
+             ("p_HV", "p (HV)"), ("IGD", "IGD"), ("p_IGD", "p (IGD)"), ("n_evals", "n_evals"),
+             ("n_dp_calls", "n_dp_calls"), ("cpu_rel", "CPU so với baseline"),
+             ("feas_front", "Khả thi (front)"), ("front_size", "Số điểm front")]
+
+
+def to_markdown(rows: list[dict], cols=None) -> str:
+    cols = cols or COLS
+    head = "| " + " | ".join(h for _, h in cols) + " |"
+    sep = "|" + "|".join("---" for _ in cols) + "|"
+    body = ["| " + " | ".join(str(r[k]) for k, _ in cols) + " |" for r in rows]
     return "\n".join([head, sep, *body])
 
 
@@ -175,10 +195,13 @@ def main() -> None:
     ap.add_argument("--instances", nargs="+", required=True)
     ap.add_argument("--out", default=None)
     ap.add_argument("--exclude", nargs="*", default=[], help="bỏ cấu hình khỏi reference set (kiểm lại bảng cũ)")
+    ap.add_argument("--order", nargs="*", default=None, help="thứ tự cấu hình trong bảng")
+    ap.add_argument("--cols", choices=["full", "tune"], default="full")
     args = ap.parse_args()
-    rows = [r for inst in args.instances for r in instance_rows(args.exp, inst, tuple(args.exclude))]
+    rows = [r for inst in args.instances
+            for r in instance_rows(args.exp, inst, tuple(args.exclude), args.order)]
     n_runs = sorted({r["n_runs"] for r in rows})
-    text = (to_markdown(rows) + "\n\n"
+    text = (to_markdown(rows, TUNE_COLS if args.cols == "tune" else None) + "\n\n"
             f"Mỗi ô: trung bình ± độ lệch chuẩn qua {n_runs} run (cùng bộ seed cho mọi cấu hình). "
             "p-value: Wilcoxon rank-sum hai phía so với baseline cùng instance; chưa hiệu chỉnh đa so sánh.\n\n"
             f"- {NOTE_RUNTIME}\n- {NOTE_REF}\n")

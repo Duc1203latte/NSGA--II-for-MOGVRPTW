@@ -194,3 +194,26 @@ def test_rate_history_arrays():
     assert pc[:2] == pytest.approx([0.7, 0.7]) and pm[:2] == pytest.approx([0.1, 0.1])
     assert np.isnan(pc[2]) and np.isnan(pm[2])
     assert rate_history([])[0].shape == (0,)
+
+
+# ---------------------------------------------------------------- tran pm sau boost (boost_pm_cap)
+def fixed_rate_params(cap):
+    ad = {**CFG["adaptive_params"], "pc_min": 0.7, "pc_max": 0.7, "pm_min": 0.1, "pm_max": 0.1,
+          "boost_pm_cap": cap}
+    return resolve_params(ad, NSGA)
+
+
+def test_boost_cap_default_is_pm_max_so_boost_is_inert_for_fixed_pm():
+    p = fixed_rate_params(None)
+    assert p["pm_cap"] == p["pm_max"] == 0.1
+    assert adaptive_rates(0, 0, 0, p, LOW, 2.0) == (0.7, 0.1)
+
+
+def test_boost_cap_lets_boost_act_on_fixed_pm_and_caps():
+    p = fixed_rate_params(0.3)
+    assert adaptive_rates(0, 0, 0, p, LOW) == (0.7, 0.1)                    # chưa boost: pm = baseline
+    assert adaptive_rates(0, 0, 0, p, LOW, 2.0)[1] == pytest.approx(0.2)
+    assert adaptive_rates(0, 0, 0, p, LOW, 1.5)[1] == pytest.approx(0.15)
+    assert adaptive_rates(0, 0, 0, p, LOW, 100.0)[1] == pytest.approx(0.3)  # bị chặn ở cap
+    assert adaptive_rates(0, 0, 0, p, 1.0, 100.0)[1] == pytest.approx(0.3)  # cả nhánh một-front
+    assert P["pm_cap"] == P["pm_max"]                                       # cấu hình mặc định không đổi

@@ -23,6 +23,10 @@ def resolve_params(adaptive_params: dict, nsga2_cfg: dict, case29: bool = False)
         p["pm_min"] = p["pm_case29"]["min"]
         p["pm_max"] = p["pm_case29"]["max"]
     p.pop("pm_case29", None)
+    # tran cho pm sau khi nhan boost: mac dinh pm_max; dat lon hon pm_max de boost co tac dung khi pm_min = pm_max
+    p["pm_cap"] = p.pop("boost_pm_cap", None)
+    if p["pm_cap"] is None:
+        p["pm_cap"] = p["pm_max"]
     if not (p["pc_min"] <= p["pc_max"] and p["pm_min"] <= p["pm_max"]):
         raise ValueError("adaptive_params: can min <= max")
     if not (p["pc_min"] <= p["baseline_pc"] <= p["pc_max"]
@@ -38,7 +42,7 @@ def adaptive_rates(rank_a: int, rank_b: int, max_rank: int, params: dict,
     """r = hang tot nhat cua hai cha me (0 = front 1). Hang cang tot thi lai/dot bien cang it.
     Neu gan ca quan the nam o front 1 (front1_fraction >= single_front_threshold) thi moi cap
     co r = 0 va thich nghi suy bien thanh pc_min/pm_min khong doi, nen tra ve pc, pm goc.
-    pm_boost > 1 nhan pm khi quan the bi tri tre, nhung pm khong bao gio vuot pm_max."""
+    pm_boost > 1 nhan pm khi quan the bi tri tre; pm khong vuot pm_cap (= boost_pm_cap, mac dinh pm_max)."""
     if front1_fraction >= params["single_front_threshold"]:
         pc, pm = params["baseline_pc"], params["baseline_pm"]
     else:
@@ -46,7 +50,7 @@ def adaptive_rates(rank_a: int, rank_b: int, max_rank: int, params: dict,
         frac = min(r / max(max_rank, 1), 1.0)
         pc = params["pc_min"] + (params["pc_max"] - params["pc_min"]) * frac
         pm = params["pm_min"] + (params["pm_max"] - params["pm_min"]) * frac
-    return pc, min(pm * pm_boost, params["pm_max"])
+    return pc, min(pm * pm_boost, params.get("pm_cap", params["pm_max"]))
 
 
 def rate_history(logs: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

@@ -118,6 +118,60 @@ Chi phí CPU: hệ số một thế hệ dp / một thế hệ baseline đo cùn
 
 **Ghi chú kỹ thuật.** `python -m src.runner analyze` báo lỗi khi các cấu hình trong cùng thí nghiệm có n_gen khác nhau, vì bảng hội tụ dựng từ các mảng độ dài khác nhau (`ValueError: All arrays must be of the same length`). `scripts/tv4_report.py` không gọi `analyze` mà dùng cùng các hàm của runner (`load_runs`, `reference_set`, `normalization_bounds`, `evaluate_front`) trừ bước hội tụ, và ghi đè `per_run.csv` của từng instance; tôi đã kiểm rằng khi bỏ `baseline_eqtime` nó tái tạo đúng từng số của bảng bốn cấu hình trước đó. Nên báo TV1.
 
+## Tuning (giai đoạn 3, seed tuning 100–104)
+
+Thí nghiệm `tv4_tune`, C102-25 và R201-50, **chỉ seed 100–104** (khác bộ 0–9 dùng để báo kết quả), n_gen = 200 (ngân sách cuối chưa chốt, sẽ chạy lại bản cuối), mọi tiến trình `OMP_NUM_THREADS=1`. Dựng bởi `scripts/tv4_tune_run.py`, `scripts/tv4_cpu_cost.py`, `scripts/tv4_report.py --cols tune`; định nghĩa cấu hình ở `scripts/tv4_tune_configs.py`. Chưa đổi mặc định trong `config.yaml`.
+
+**Cấu hình đã chạy**
+- `dp_every_eval`: hành vi hiện tại (mọi lần chấm dùng DP với trọng số riêng của cá thể).
+- `dp_polish_k10`, `dp_polish_k30`: chế độ mới `improvements.dp_split_params.mode: polish`. Tiến hoá dùng split baseline (không bốc trọng số nên quần thể cuối **giống hệt baseline cùng seed**, có test), sau thế hệ cuối mỗi hoán vị được chấm lại bằng DP với K vector trọng số cố định (lưới simplex tất định, không RNG), gộp với quần thể cuối, bỏ điểm trùng vector mục tiêu, lấy tập không trội làm front. Số lời gọi `evaluate_dp` thêm (n_pop x K) tính vào `n_evals` và `n_dp_calls`.
+- `adapt_v1`: khoảng đặt tâm ở baseline, chỉ mở lên trên: pc 0.7–0.9, pm 0.1–0.3.
+- `adapt_v2_g{10,20}_b{1.5,2.0}`: pc = 0.7, pm = 0.1 cố định, chỉ có cơ chế tăng pm khi trì trệ (`stagnation_gens` 10 hoặc 20, `boost` 1.5 hoặc 2.0). Để boost có tác dụng khi `pm_min = pm_max`, tôi thêm khoá `adaptive_params.boost_pm_cap` (mặc định `null` = `pm_max`, hành vi cũ không đổi); ở v2 đặt 0.3. Nếu không có khoá này, đề xuất "pc/pm cố định + boost" của mục chẩn đoán sẽ vô hiệu vì boost bị chặn ở `pm_max = 0.1`.
+- `adapt_v3_g10_b2.0`: v1 cộng với v2 tốt nhất theo HV trung bình hai instance (g10, b2.0).
+- `baseline_g300`: **đối chứng tôi thêm ngoài danh sách**, baseline chạy 300 thế hệ (khoảng 1.4–1.5 lần chi phí CPU), để biết phần cải thiện của `polish` có đơn giản là do tốn thêm chi phí hay không.
+
+### Kết quả
+
+| Instance | Cấu hình | HV | ΔHV vs baseline | p (HV) | IGD | p (IGD) | n_evals | n_dp_calls | CPU so với baseline | Khả thi (front) | Số điểm front |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| C102-25 | baseline | 0.9059 ± 0.1382 | — | — | 0.2666 ± 0.0633 | — | 16080 | 0 | 1.00 | 1.00 | 9.8 |
+| C102-25 | baseline_g300 | 0.9467 ± 0.1132 | +0.0407 | 0.347 | 0.2403 ± 0.0407 | 0.347 | 24080 | 0 | 1.38 | 1.00 | 11.2 |
+| C102-25 | dp_every_eval | 1.0329 ± 0.1658 | +0.1269 | 0.251 | 0.1562 ± 0.0656 | 0.028 | 16080 | 16080 | 8.88 | 1.00 | 25.4 |
+| C102-25 | dp_polish_k10 | 0.9710 ± 0.1262 | +0.0651 | 0.251 | 0.1782 ± 0.0577 | 0.047 | 16880 | 800 | 1.34 | 1.00 | 21.0 |
+| C102-25 | dp_polish_k30 | 0.9762 ± 0.1192 | +0.0703 | 0.251 | 0.1779 ± 0.0582 | 0.047 | 18480 | 2400 | 2.13 | 1.00 | 21.4 |
+| C102-25 | adapt_v1 | 0.9184 ± 0.2716 | +0.0124 | 0.754 | 0.2801 ± 0.1375 | 0.754 | 16080 | 0 | 1.09 | 1.00 | 13.4 |
+| C102-25 | adapt_v2_g10_b1.5 | 0.9036 ± 0.1369 | -0.0023 | 0.676 | 0.2605 ± 0.0576 | 0.754 | 16080 | 0 | 1.01 | 1.00 | 11.2 |
+| C102-25 | adapt_v2_g10_b2.0 | 0.9121 ± 0.1329 | +0.0061 | 0.754 | 0.2587 ± 0.0557 | 0.602 | 16080 | 0 | 0.95 | 1.00 | 12.0 |
+| C102-25 | adapt_v2_g20_b1.5 | 0.9059 ± 0.1382 | +0.0000 | 1.000 | 0.2666 ± 0.0633 | 1.000 | 16080 | 0 | 0.89 | 1.00 | 9.8 |
+| C102-25 | adapt_v2_g20_b2.0 | 0.9059 ± 0.1382 | +0.0000 | 1.000 | 0.2666 ± 0.0633 | 1.000 | 16080 | 0 | 0.92 | 1.00 | 9.8 |
+| C102-25 | adapt_v3_g10_b2.0 | 0.9184 ± 0.2712 | +0.0125 | 0.754 | 0.2789 ± 0.1368 | 0.754 | 16080 | 0 | 0.87 | 1.00 | 13.2 |
+| R201-50 | baseline | 0.7894 ± 0.0987 | — | — | 0.1979 ± 0.0518 | — | 16080 | 0 | 1.00 | 1.00 | 19.0 |
+| R201-50 | baseline_g300 | 0.9675 ± 0.0757 | +0.1781 | 0.016 | 0.1079 ± 0.0291 | 0.009 | 24080 | 0 | 1.46 | 1.00 | 29.2 |
+| R201-50 | dp_every_eval | 0.9161 ± 0.0827 | +0.1267 | 0.076 | 0.1411 ± 0.0582 | 0.175 | 16080 | 16080 | 19.73 | 1.00 | 40.4 |
+| R201-50 | dp_polish_k10 | 0.8687 ± 0.0896 | +0.0793 | 0.175 | 0.1574 ± 0.0500 | 0.117 | 16880 | 800 | 1.82 | 1.00 | 32.2 |
+| R201-50 | dp_polish_k30 | 0.8695 ± 0.0896 | +0.0802 | 0.175 | 0.1570 ± 0.0504 | 0.117 | 18480 | 2400 | 3.95 | 1.00 | 34.6 |
+| R201-50 | adapt_v1 | 0.7840 ± 0.1061 | -0.0053 | 0.602 | 0.1992 ± 0.0727 | 0.754 | 16080 | 0 | 1.09 | 1.00 | 21.4 |
+| R201-50 | adapt_v2_g10_b1.5 | 0.7894 ± 0.0987 | +0.0000 | 1.000 | 0.1979 ± 0.0518 | 1.000 | 16080 | 0 | 1.10 | 1.00 | 19.0 |
+| R201-50 | adapt_v2_g10_b2.0 | 0.7894 ± 0.0987 | +0.0000 | 1.000 | 0.1979 ± 0.0518 | 1.000 | 16080 | 0 | 1.09 | 1.00 | 19.0 |
+| R201-50 | adapt_v2_g20_b1.5 | 0.7894 ± 0.0987 | +0.0000 | 1.000 | 0.1979 ± 0.0518 | 1.000 | 16080 | 0 | 1.07 | 1.00 | 19.0 |
+| R201-50 | adapt_v2_g20_b2.0 | 0.7894 ± 0.0987 | +0.0000 | 1.000 | 0.1979 ± 0.0518 | 1.000 | 16080 | 0 | 1.02 | 1.00 | 19.0 |
+| R201-50 | adapt_v3_g10_b2.0 | 0.7840 ± 0.1061 | -0.0053 | 0.602 | 0.1992 ± 0.0727 | 0.754 | 16080 | 0 | 1.00 | 1.00 | 21.4 |
+
+Mỗi ô: trung bình ± độ lệch chuẩn qua 5 seed; p-value Wilcoxon rank-sum hai phía so với `baseline` (với 5 seed mỗi bên, p nhỏ nhất có thể đạt là khoảng 0.008), chưa hiệu chỉnh đa so sánh. "CPU so với baseline" là thời gian CPU tuần tự (`time.process_time`, chạy lần lượt trong một tiến trình, trung bình seed 100 và 101), không phải thời gian tường của lượt chạy song song; hai lần đo `baseline` cách nhau khoảng 7%, nên tỉ số CPU gần 1.0 (các biến thể `adapt_*`) chỉ nên đọc là "không đáng kể". HV và IGD ở đây dùng reference set gộp của cả 12 cấu hình trong `tv4_tune` trên mỗi instance, **không so được với bảng `tv4_main`**.
+
+### Đọc kết quả
+
+- **`dp_split`.** `every_eval` cho HV cao nhất trên C102-25 (+0.127, IGD p = 0.028) nhưng tốn khoảng 8.9 lần (C102-25) và 19.7 lần (R201-50) CPU của baseline. `polish` giữ 50–63% mức tăng HV đó (+0.065 và +0.079) với 1.3–1.8 lần chi phí (K = 10); K = 30 chỉ hơn K = 10 khoảng 0.001–0.005 HV nhưng tốn gấp 1.6–2.2 lần so với K = 10, nên không đáng. Không cái nào trong ba đạt p < 0.05 về HV với 5 seed. **Đối chứng `baseline_g300` với 1.4–1.5 lần chi phí đạt +0.041 trên C102-25 (kém `polish_k10`, +0.065, không có ý nghĩa thống kê) nhưng +0.178 trên R201-50 (p = 0.016), vượt cả `polish_k10` (+0.079) lẫn `every_eval` (+0.127, tốn 19.7 lần)**; vậy ở R201-50 phần cải thiện của DP không vượt thứ có được bằng cách chạy baseline lâu hơn một chút. Điểm cộng riêng của DP là front dày hơn (21 và 32 điểm với `polish_k10`, so với 10 và 19 của baseline, 11 và 29 của `baseline_g300`) và IGD tốt hơn có ý nghĩa ở C102-25 (`polish` p = 0.047, `every_eval` p = 0.028, trong khi `baseline_g300` p = 0.347).
+- **`adaptive_rates`.** `adapt_v1` (khoảng đặt tâm ở baseline) không còn gây suy giảm như bản mặc định ở `tv4_main` (R201-50: ΔHV −0.005, p = 0.602, so với −0.091, p = 0.001 ở `tv4_main`) nhưng cũng không cải thiện (C102-25 +0.012, p = 0.754, độ lệch chuẩn lớn). Cơ chế tăng pm khi trì trệ gần như **không bao giờ kích hoạt**: ở g10, boost chỉ chạy 0–15 trên 200 thế hệ mỗi run ở C102-25 và 0 thế hệ ở R201-50; ở g20 là 0 ở cả hai. Lý do là front 1 gần như đổi sau mỗi thế hệ (chỉ cần một vector không trội mới), nên điều kiện "không đổi k thế hệ" hầu như không xảy ra. Hệ quả: cả bốn cấu hình v2 cho **đúng từng chữ số** kết quả của baseline trên R201-50 (và hai trong bốn trên C102-25), `adapt_v3` thực chất bằng `adapt_v1`, và các chênh lệch nhỏ còn lại ở C102-25 (±0.006) là nhiễu. Để cơ chế này có tác dụng cần đổi tiêu chí trì trệ (ví dụ ngưỡng cải thiện HV), việc đó nằm ngoài phần tuning tham số.
+- **Giới hạn.** 5 seed, hai instance, chọn trong 12 cấu hình trên cùng các seed tuning (nên có thiên lệch chọn lọc), n_gen = 200 chưa chốt. Bảng chỉ để chọn tham số, kết luận phải dựa trên lượt chạy cuối với seed 0–9.
+
+### Khuyến nghị (chưa áp dụng vào `config.yaml`)
+
+| Cờ | Đề xuất | Lý do (một dòng) |
+|---|---|---|
+| `dp_split` | `mode: polish`, `polish_k: 10` | giữ 50–63% mức tăng HV của `every_eval` với 1.3–1.8 lần thay vì 9–20 lần chi phí CPU, front dày hơn; K = 30 không đáng thêm; lưu ý ở R201-50 chạy baseline thêm thế hệ còn tốt hơn |
+| `adaptive_rates` | giữ **tắt**; nếu phải bật thì `v1` (pc 0.7–0.9, pm 0.1–0.3, `stagnation_gens: 0`) | `v1` bỏ được suy giảm của bản mặc định nhưng chưa có bằng chứng cải thiện; phần trì trệ vô hiệu nên không đáng bật |
+
 ## Ghi chú
 
 - Thời gian chạy đo khi 8 tiến trình chạy song song, chỉ so được với nhau trong bảng này. Chi phí tham chiếu của dp_split khi chạy tuần tự (lượt chạy thử, 20 thế hệ): ~9x ở n=25, ~24x ở n=50, ~28x ở n=100 so với baseline.

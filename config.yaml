@@ -113,11 +113,15 @@ improvements:
     pm_case29: {min: 0.1, max: 0.4}   # khoang pm rieng cho case29 (pm goc 0.2 nam trong khoang)
     single_front_threshold: 0.9   # >= ty le nay quan the o front 1 thi dung pc/pm goc (nsga2.pc, nsga2.pm)
     stagnation_gens: 0        # 0 = tat; front 1 khong doi qua ngan nay generation thi nhan pm them boost
-    boost: 1.5                # he so nhan pm khi tri tre, bi chan o pm_max
+    boost: 1.5                # he so nhan pm khi tri tre, bi chan o boost_pm_cap
+    boost_pm_cap: null        # tran pm sau boost; null = pm_max. Dat > pm_max khi pm_min = pm_max (pm co dinh)
   # Tham so cua dp_split (chi dung khi dp_split = true)
   dp_split_params:
     weight_dist: dirichlet    # phan phoi trong so moi ca the: dirichlet | onehot (sample_weights)
     weight_inherit: fresh     # trong so cua con: fresh (boc moi) | parent (chep cua mot cha me) (child_weights)
+    mode: every_eval          # every_eval: moi lan cham dung evaluate_dp voi trong so cua ca the (mac dinh)
+                              # polish: tien hoa dung split cua baseline, chi sau the he cuoi moi chay DP
+    polish_k: 10              # polish: so vector trong so (luoi simplex tat dinh) cho moi hoan vi cuoi
     g3_scale: 1.0             # he so chuan hoa g3 (g3 da nam trong [0,1]); f1, f2 lay trung binh tren 3 hoan vi cham bang decoder.split()
 
 # ---------------------------------------------------------------------------

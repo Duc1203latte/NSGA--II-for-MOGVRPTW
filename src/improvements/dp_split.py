@@ -107,6 +107,29 @@ def child_weights(rng, parent_a_weights, parent_b_weights, params: dict) -> np.n
     raise ValueError(f"weight_inherit = {mode!r} chua duoc ho tro")
 
 
+def simplex_lattice(k: int) -> np.ndarray:
+    """k vector trong so (k x 3), tat dinh, KHONG RNG, cho che do polish.
+    Luoi {(i, j, l) / m : i + j + l = m} voi m nho nhat co it nhat k diem; neu thua thi chon k diem bang
+    farthest-point sampling bat dau tu ba dinh (hoa thi lay chi so nho hon), nen luon co ca ba cuc."""
+    if k < 1:
+        raise ValueError("polish_k phai >= 1")
+    m = 1
+    while (m + 1) * (m + 2) // 2 < k:
+        m += 1
+    grid = np.array([(i, j, m - i - j) for i in range(m + 1) for j in range(m + 1 - i)], float) / m
+    if k == 1:
+        return np.full((1, 3), 1.0 / 3.0)
+    corners = [int(np.flatnonzero((grid == np.eye(3)[c]).all(axis=1))[0]) for c in range(3)]
+    chosen = corners[:min(k, 3)]
+    d = np.min(np.linalg.norm(grid[:, None, :] - grid[None, chosen, :], axis=2), axis=1)
+    while len(chosen) < k:
+        d[chosen] = -1.0
+        nxt = int(np.argmax(d))
+        chosen.append(nxt)
+        d = np.minimum(d, np.linalg.norm(grid - grid[nxt], axis=1))
+    return grid[chosen]
+
+
 def _greedy_order(inst: Instance, key) -> list[int]:
     """Di tuan tu tu kho, moi buoc chon khach chua tham co key nho nhat."""
     left = list(range(1, inst.n + 1))

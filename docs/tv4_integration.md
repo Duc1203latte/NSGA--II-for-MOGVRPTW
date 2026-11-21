@@ -30,7 +30,9 @@ Dành cho TV1/TV2. Hai cải tiến độc lập, mỗi cái một cờ trong `c
 
 ## Khoá config
 
-`improvements.dp_split` (cờ), `improvements.dp_split_params`: `weight_dist`, `weight_inherit`, `g3_scale` (1.0).
+`improvements.dp_split` (cờ), `improvements.dp_split_params`: `weight_dist`, `weight_inherit`, `g3_scale` (1.0), `mode`, `polish_k`.
+`dp_split_params.mode`: `every_eval` (mặc định, mọi cá thể chấm bằng DP với trọng số riêng) hoặc `polish` (tiến hoá dùng split baseline, **không bốc trọng số nên dãy RNG và quần thể cuối giống hệt baseline cùng seed**; sau thế hệ cuối mỗi hoán vị được chấm lại bằng DP với `polish_k` vector trọng số cố định từ `simplex_lattice(k)`, gộp với quần thể cuối, bỏ điểm trùng vector mục tiêu, lấy tập không trội làm front). Polish thêm `n_pop * polish_k` lời gọi `evaluate_dp`, tính vào `n_evals` và `n_dp_calls`; kết quả có `pre_polish` (quần thể trước polish) và `W` có hàng NaN cho điểm chấm bằng split baseline.
+`adaptive_params.boost_pm_cap` (mặc định `null` = `pm_max`): trần của pm sau khi nhân boost; cần đặt lớn hơn `pm_max` khi cố định pm (`pm_min = pm_max`) mà vẫn muốn boost có tác dụng.
 `improvements.adaptive_rates` (cờ), `improvements.adaptive_params`: `pc_min/pc_max`, `pm_min/pm_max`, `pm_case29: {min, max}`, `single_front_threshold`, `stagnation_gens` (0 = tắt), `boost`.
 
 ## Quy tắc RNG: cờ tắt thì không gọi RNG lần nào

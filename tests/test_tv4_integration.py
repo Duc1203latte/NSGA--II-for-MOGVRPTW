@@ -162,3 +162,104 @@ def test_both_on_runs_and_is_deterministic():
     assert a["n_dp_calls"] == a["n_evals"] and np.all(a["CV"] == 0)
     c = nsga2.run(inst, cfg, 8)
     assert c["pop"] != a["pop"]
+
+
+# ---------------------------------------------------------------- dp_split mode "polish"
+from src.decoder import evaluate_detail  # noqa: E402
+from src.improvements.dp_split import simplex_lattice  # noqa: E402
+
+
+@pytest.mark.parametrize("k", [1, 2, 3, 5, 10, 30])
+def test_simplex_lattice(k):
+    np.random.seed(0)
+    state = np.random.get_state()
+    lat = simplex_lattice(k)
+    assert lat.shape == (k, 3) and np.all(lat >= 0) and np.allclose(lat.sum(axis=1), 1.0)
+    assert len({tuple(r) for r in lat.round(12).tolist()}) == k           # không trùng
+    assert np.array_equal(lat, simplex_lattice(k))                         # tất định
+    if k >= 3:
+        assert np.array_equal(lat[:3], np.eye(3))                          # luôn có ba cực
+    assert np.array_equal(state[1], np.random.get_state()[1])              # không dùng RNG toàn cục
+    if k == 10:                                                            # m = 3: đủ cả lưới
+        assert {tuple(r) for r in (lat * 3).round().astype(int).tolist()} == {
+            (i, j, 3 - i - j) for i in range(4) for j in range(4 - i)}
+
+
+def polish_cfg(n_gen, n_pop, k):
+    cfg = make_cfg(n_gen, n_pop=n_pop, dp_split=True)
+    cfg["improvements"]["dp_split_params"].update(mode="polish", polish_k=k)
+    return cfg
+
+
+_REAL_DEFAULT_RNG = np.random.default_rng
+
+
+class CountingRng:
+    """Bọc Generator, ghi lại mọi lần gọi phương thức sinh số."""
+    calls: list = []
+
+    def __init__(self, seed):
+        self._g = _REAL_DEFAULT_RNG(seed)
+
+    def __getattr__(self, name):
+        fn = getattr(self._g, name)
+
+        def wrapped(*a, **k):
+            CountingRng.calls.append(name)
+            return fn(*a, **k)
+        return wrapped
+
+
+@pytest.mark.parametrize("name,n,k", [("C102", 25, 10), ("R201", 50, 30)])
+def test_polish_final_population_equals_baseline_bit_for_bit(name, n, k, monkeypatch):
+    n_pop, n_gen = 24, 8
+    base_cfg, pol_cfg = make_cfg(n_gen, n_pop=n_pop), polish_cfg(n_gen, n_pop, k)
+    inst = load_instance(name, n, base_cfg)
+    seqs = {}
+    for label, cfg in (("base", base_cfg), ("pol", pol_cfg)):
+        CountingRng.calls = []
+        monkeypatch.setattr(nsga2.np.random, "default_rng", CountingRng)
+        seqs[label] = (nsga2.run(inst, cfg, 5), list(CountingRng.calls))
+        monkeypatch.undo()
+    base, pol = seqs["base"][0], seqs["pol"][0]
+    pre = pol["pre_polish"]
+    assert pre["pop"] == base["pop"]
+    assert [[float(x).hex() for x in r] for r in pre["F"]] == [[float(x).hex() for x in r] for r in base["F"]]
+    assert np.array_equal(pre["CV"], base["CV"]) and np.array_equal(pre["front"], base["front"])
+    assert all(np.array_equal(a, b) for a, b in zip(pol["history"], base["history"]))
+    assert seqs["pol"][1] == seqs["base"][1]            # cùng dãy gọi RNG: polish không bốc số ngẫu nhiên
+    assert base["pre_polish"] is None and base["dp_mode"] is None
+    # đếm lời gọi DP thêm: n_pop * K, tính vào cả n_evals lẫn n_dp_calls
+    assert pol["n_dp_calls"] == n_pop * k and pol["n_evals"] == base["n_evals"] + n_pop * k
+    assert pol["dp_mode"] == "polish"
+
+
+@pytest.mark.parametrize("name,n,k", [("C102", 25, 10), ("R201", 50, 10)])
+def test_polish_front_weakly_dominates_baseline_front(name, n, k):
+    cfg = polish_cfg(12, 30, k)
+    inst = load_instance(name, n, cfg)
+    base = nsga2.run(inst, make_cfg(12, n_pop=30), 2)
+    pol = nsga2.run(inst, cfg, 2)
+    assert np.all(base["CV"] == 0) and np.all(pol["CV"] == 0)
+    bf, pf = base["F"][base["front"]], pol["F"][pol["front"]]
+    for b in bf:
+        assert np.any(np.all(pf <= b, axis=1)), "điểm baseline không được phủ yếu bởi front đã polish"
+    assert len({tuple(r) for r in pf.tolist()}) == len(pf)          # không có điểm trùng vector mục tiêu
+    # mỗi dòng chấm lại đúng bằng evaluator đã dùng: NaN = split baseline, còn lại = DP với trọng số đó
+    from src.improvements.dp_split import evaluate_dp, objective_scales
+    scales = objective_scales(inst, cfg["improvements"]["dp_split_params"]["g3_scale"])
+    for i in pol["front"]:
+        w = pol["W"][i]
+        d = evaluate_detail(pol["pop"][i], inst) if np.isnan(w).all() else evaluate_dp(pol["pop"][i], inst, w, scales)
+        assert np.array_equal(pol["F"][i], [d["f1"], d["f2"], 1 - d["f3"]])
+
+
+def test_polish_is_deterministic_and_rejects_bad_mode():
+    cfg = polish_cfg(5, 16, 10)
+    inst = load_instance("C102", 25, cfg)
+    a, b = nsga2.run(inst, cfg, 9), nsga2.run(inst, cfg, 9)
+    assert a["pop"] == b["pop"] and np.array_equal(a["F"], b["F"]) and np.array_equal(a["front"], b["front"])
+    assert np.array_equal(a["W"], b["W"], equal_nan=True)
+    cfg["improvements"]["dp_split_params"]["mode"] = "nope"
+    with pytest.raises(ValueError):
+        nsga2.run(inst, cfg, 0)

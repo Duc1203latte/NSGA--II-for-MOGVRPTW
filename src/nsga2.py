@@ -205,6 +205,13 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
     rng = np.random.default_rng(seed)
     imp = cfg.get("improvements", {})
     use_dp, use_adaptive = bool(imp.get("dp_split", False)), bool(imp.get("adaptive_rates", False))
+    # --- TV4 dp_split có hai chế độ: every_eval (chấm mọi cá thể bằng DP) và polish (chỉ sau thế hệ cuối)
+    use_polish = False
+    if use_dp:
+        dp_mode = imp["dp_split_params"].get("mode", "every_eval")
+        if dp_mode not in ("every_eval", "polish"):
+            raise ValueError(f"dp_split_params.mode = {dp_mode!r}, chỉ nhận every_eval | polish")
+        use_polish, use_dp = dp_mode == "polish", dp_mode == "every_eval"   # polish: tiến hoá như baseline
 
     pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
     # --- TV4 dp_split: trọng số khởi tạo, bốc SAU các hoán vị để dãy hoán vị giống baseline.
@@ -266,6 +273,26 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
     rank, _ = rank_and_crowding(F, CV)
     history.append(F[rank == 0].copy())
     front = np.flatnonzero(rank == 0)
+    pre_polish = None
+    if use_polish:  # --- TV4 dp_split polish: DP với K trọng số cố định cho từng hoán vị cuối, không RNG
+        from src.improvements.dp_split import objective_scales, simplex_lattice
+        dp_params = imp["dp_split_params"]
+        pre_polish = {"pop": [x.tolist() for x in pop], "F": F.copy(), "CV": CV.copy(), "front": front.copy()}
+        scales = objective_scales(inst, dp_params["g3_scale"])
+        lattice = simplex_lattice(dp_params["polish_k"])
+        cand = [x for x in pop for _ in lattice]
+        W_cand = np.tile(lattice, (len(pop), 1))
+        F_c, CV_c = evaluate_population(cand, inst, W_cand, scales)
+        n_evals += len(cand)
+        n_dp_calls += len(cand)
+        # gộp với quần thể cuối (hàng baseline đứng trước), bỏ hàng có cùng vector mục tiêu và CV
+        pool_pop, pool_F, pool_CV = pop + cand, np.vstack([F, F_c]), np.concatenate([CV, CV_c])
+        pool_W = np.vstack([np.full((len(pop), 3), np.nan), W_cand])     # NaN = chấm bằng split baseline
+        _, uniq = np.unique(np.column_stack([pool_F, pool_CV]), axis=0, return_index=True)
+        uniq.sort()
+        pop, F, CV, W = [pool_pop[i] for i in uniq], pool_F[uniq], pool_CV[uniq], pool_W[uniq]
+        rank, _ = rank_and_crowding(F, CV)
+        front = np.flatnonzero(rank == 0)
     return {
         "pop": [x.tolist() for x in pop],
         "F": F,                     # cực tiểu: (f1, f2, 1 - f3)
@@ -282,4 +309,6 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         "feasible_frac_pop": float(np.mean(CV == 0)),     # tỉ lệ nghiệm không vượt đội xe
         "feasible_frac_front": float(np.mean(CV[front] == 0)),
         "wall_time_s": time.perf_counter() - t_start,
+        "dp_mode": "polish" if use_polish else ("every_eval" if use_dp else None),
+        "pre_polish": pre_polish,   # polish: quần thể/F/CV/front trước khi polish (bằng baseline cùng seed)
     }
