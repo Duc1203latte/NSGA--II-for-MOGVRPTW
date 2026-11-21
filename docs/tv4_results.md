@@ -118,6 +118,30 @@ Chi phí CPU: hệ số một thế hệ dp / một thế hệ baseline đo cùn
 
 **Ghi chú kỹ thuật.** `python -m src.runner analyze` báo lỗi khi các cấu hình trong cùng thí nghiệm có n_gen khác nhau, vì bảng hội tụ dựng từ các mảng độ dài khác nhau (`ValueError: All arrays must be of the same length`). `scripts/tv4_report.py` không gọi `analyze` mà dùng cùng các hàm của runner (`load_runs`, `reference_set`, `normalization_bounds`, `evaluate_front`) trừ bước hội tụ, và ghi đè `per_run.csv` của từng instance; tôi đã kiểm rằng khi bỏ `baseline_eqtime` nó tái tạo đúng từng số của bảng bốn cấu hình trước đó. Nên báo TV1.
 
+## Lateness under split rules
+
+Câu hỏi: `split_rule = capacity_time` của baseline có đã loại phần lớn trễ hay không (giả thuyết dùng để giải thích vì sao `dp` ít lợi)? Không chạy tiến hoá: `python -m scripts.tv4_split_lateness` tách lại cùng một tập hoán vị bằng ba cách (`capacity` = `split_greedy`, `capacity_time`, và `split_dp` với trọng số [1/3, 1/3, 1/3]) rồi chấm bằng `evaluate_routes_detail`. Tập A: 200 hoán vị ngẫu nhiên (`default_rng(0)`); tập B: 800 hoán vị của quần thể cuối `baseline` (seed 0–9, 10 x 80). Trung bình (độ lệch chuẩn nằm ở `results/tv4_main/split_lateness.md`); `late_min`, `early_min` là tổng phút trễ/sớm, F4 là phạt (giờ), "Khả thi" là tỉ lệ có số xe không vượt `fleet_size` (= 25 ở cả ba instance).
+
+| Tập | Quy tắc | F4 | late_min | early_min | Số xe | f1 | f3 | Khả thi |
+|---|---|---|---|---|---|---|---|---|
+| A: C102-25 ngẫu nhiên | capacity | 23280 | 23020 | 797 | 2.0 | 25710 | 0.134 | 1.00 |
+| | capacity_time | 1214 | 4.0 | 3630 | 10.6 | 4809 | 0.427 | 1.00 |
+| | dp | 1525 | 848 | 2031 | 6.9 | 4332 | 0.440 | 1.00 |
+| A: R201-50 ngẫu nhiên | capacity | 42130 | 41790 | 1012 | 2.0 | 50460 | 0.037 | 1.00 |
+| | capacity_time | 3101 | 23.6 | 9231 | 21.6 | 12460 | 0.270 | 1.00 |
+| | dp | 3496 | 1577 | 5757 | 13.7 | 11660 | 0.302 | 1.00 |
+| A: C102-100 ngẫu nhiên | capacity | 133800 | 133100 | 2014 | 5.0 | 152200 | 0.076 | 1.00 |
+| | capacity_time | 65660 | 62400 | 9753 | 26.8 | 85310 | 0.242 | **0.00** |
+| | dp | 9753 | 7342 | 7232 | 25.0 | 26890 | 0.407 | 1.00 |
+| B: C102-25 quần thể cuối | capacity | 13080 | 12900 | 525 | 2.0 | 14430 | 0.429 | 1.00 |
+| | capacity_time | 128 | 8.5 | 358 | 3.15 | 1493 | 0.898 | 1.00 |
+| | dp | 111 | 12.9 | 295 | 3.12 | 1469 | 0.906 | 1.00 |
+| B: R201-50 quần thể cuối | capacity | 27380 | 27090 | 890 | 2.0 | 33100 | 0.164 | 1.00 |
+| | capacity_time | 850 | 32.4 | 2452 | 7.27 | 6291 | 0.691 | 1.00 |
+| | dp | 857 | 84.0 | 2318 | 6.97 | 6263 | 0.692 | 1.00 |
+
+**Nhận xét.** Giả thuyết được dữ liệu ủng hộ. So với `capacity`, `capacity_time` giảm `late_min` từ hàng chục nghìn phút xuống còn 4–32 phút (C102-25 và R201-50, cả hoán vị ngẫu nhiên lẫn quần thể cuối), tức loại gần hết trễ. Trên quần thể cuối, nơi `dp` đang được dùng để cải thiện, `dp` chỉ hơn `capacity_time` khoảng 1.6% về f1 ở C102-25 (1469 so với 1493) và 0.4% ở R201-50 (6263 so với 6291), f3 hầu như không đổi (0.906 so với 0.898; 0.692 so với 0.691), F4 ngang nhau (111 so với 128; 857 so với 850) và `dp` thậm chí trễ nhiều hơn (12.9 so với 8.5 phút; 84 so với 32), bù lại bằng bớt đến sớm. Khoảng trống cho tách tối ưu ở quần thể đã tiến hoá vì vậy rất hẹp, khớp với lợi ích nhỏ của `dp` ở mục "Nhận xét". Hai lưu ý: (1) ở hoán vị ngẫu nhiên, `dp` hơn rõ về f1 (4332 so với 4809, 10%; 11660 so với 12460, 6%), nên khoảng trống chỉ hẹp khi hoán vị đã được tiến hoá theo `capacity_time`; quần thể cuối vốn thiên về quy tắc này nên tập B không công bằng tuyệt đối với `dp`, và các hoán vị của 10 seed không độc lập (số liệu mô tả, không kiểm định); (2) ở C102-100, `capacity_time` dùng trung bình 26.8 xe, **vượt `fleet_size` = 25 ở mọi hoán vị (khả thi 0.00)** vì quy tắc chỉ mở tuyến mới theo tải trọng khi đã hết xe, trong khi `dp` nhiều lớp luôn khả thi nhưng trễ nhiều hơn (F4 9753 so với 65660 là do `capacity_time` bị tính phạt vượt đội xe, không phải do `dp` đến muộn ít hơn). Đây là số đo cho vấn đề đội xe ở n = 100 đang chờ TV1.
+
 ## Tuning (giai đoạn 3, seed tuning 100–104)
 
 Thí nghiệm `tv4_tune`, C102-25 và R201-50, **chỉ seed 100–104** (khác bộ 0–9 dùng để báo kết quả), n_gen = 200 (ngân sách cuối chưa chốt, sẽ chạy lại bản cuối), mọi tiến trình `OMP_NUM_THREADS=1`. Dựng bởi `scripts/tv4_tune_run.py`, `scripts/tv4_cpu_cost.py`, `scripts/tv4_report.py --cols tune`; định nghĩa cấu hình ở `scripts/tv4_tune_configs.py`. Chưa đổi mặc định trong `config.yaml`.

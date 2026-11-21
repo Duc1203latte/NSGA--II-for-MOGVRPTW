@@ -1,6 +1,6 @@
 # Phần của TV4: tách tuyến tối ưu (DP split), polish và tỉ lệ lai/đột biến thích nghi
 
-> Bản nháp cho báo cáo nhóm. Mọi con số lấy từ `docs/tv4_results.md`; những chỗ là giải thích chưa được kiểm chứng bằng thực nghiệm đều ghi rõ là giả thuyết.
+> Bản nháp cho báo cáo nhóm. Mọi con số lấy từ `docs/tv4_results.md`; những chỗ là suy luận chưa được kiểm bằng thực nghiệm (cơ chế khiến polish hiệu quả) đều ghi rõ.
 
 ## 1. Phương pháp
 
@@ -111,7 +111,18 @@ Cơ chế tăng pm khi trì trệ gần như không kích hoạt: ở `stagnatio
 
 ## 4. Thảo luận
 
-**Vì sao `dp` ở chế độ chấm mọi cá thể không đáng chi phí.** Hai quan sát từ dữ liệu. Thứ nhất, tính theo số thế hệ, `dp` không cải thiện HV có ý nghĩa thống kê (p = 0.174 ở C102-25, p = 0.406 ở R201-50); điều nó thay đổi rõ là hình dạng front (nhiều điểm hơn, f2 tốt nhất thấp hơn 12–16%) với cái giá là SP cao hơn, f1 và f3 trung bình xấu hơn. Thứ hai, tính theo chi phí CPU, mỗi thế hệ `dp` tốn 8.7–18 lần một thế hệ baseline và baseline đạt HV cao hơn sau khoảng 0.24–0.8 chi phí đó. Một giả thuyết giải thích quan sát đầu: quy tắc `split_rule = capacity_time` của baseline vốn đã loại phần lớn các tuyến trễ, nên không gian cải thiện còn lại cho tách tối ưu chủ yếu nằm ở f2, khớp với việc lợi ích của `dp` tập trung ở f2 còn f1 và f3 không tốt hơn. **Đây là giả thuyết; chúng tôi chưa chạy kiểm chứng trực tiếp** (ví dụ đo mức trễ của baseline theo từng `split_rule`).
+**Vì sao `dp` ở chế độ chấm mọi cá thể không đáng chi phí.** Hai quan sát từ dữ liệu. Thứ nhất, tính theo số thế hệ, `dp` không cải thiện HV có ý nghĩa thống kê (p = 0.174 ở C102-25, p = 0.406 ở R201-50); điều nó thay đổi rõ là hình dạng front (nhiều điểm hơn, f2 tốt nhất thấp hơn 12–16%) với cái giá là SP cao hơn, f1 và f3 trung bình xấu hơn. Thứ hai, tính theo chi phí CPU, mỗi thế hệ `dp` tốn 8.7–18 lần một thế hệ baseline và baseline đạt HV cao hơn sau khoảng 0.24–0.8 chi phí đó. Quan sát đầu được giải thích một phần bằng số đo trực tiếp (không chạy tiến hoá, tách lại cùng các hoán vị bằng ba quy tắc, `scripts/tv4_split_lateness.py`): quy tắc `capacity_time` của baseline đã loại gần hết trễ, nên tách tối ưu còn rất ít để cải thiện ở quần thể đã tiến hoá.
+
+| Quần thể cuối baseline (800 hoán vị, seed 0–9) | Quy tắc | late_min | F4 | f1 | f3 | Số xe |
+|---|---|---|---|---|---|---|
+| C102-25 | `capacity` | 12900 | 13080 | 14430 | 0.429 | 2.0 |
+| | `capacity_time` | 8.5 | 128 | 1493 | 0.898 | 3.15 |
+| | `dp` | 12.9 | 111 | 1469 | 0.906 | 3.12 |
+| R201-50 | `capacity` | 27090 | 27380 | 33100 | 0.164 | 2.0 |
+| | `capacity_time` | 32.4 | 850 | 6291 | 0.691 | 7.27 |
+| | `dp` | 84.0 | 857 | 6263 | 0.692 | 6.97 |
+
+So với `capacity`, `capacity_time` giảm số phút trễ từ hàng chục nghìn xuống còn 8–32 phút; `dp` chỉ hơn `capacity_time` khoảng 1.6% (C102-25) và 0.4% (R201-50) về f1, f3 gần như không đổi, F4 ngang nhau, và còn trễ nhiều hơn (12.9 so với 8.5 phút; 84 so với 32). Điều này khớp với việc `dp` không cải thiện HV có ý nghĩa. Hai giới hạn: trên hoán vị ngẫu nhiên (chưa tiến hoá) `dp` hơn rõ về f1 (C102-25: 4332 so với 4809, khoảng 10%; R201-50: 11660 so với 12460, khoảng 6%), tức khoảng trống chỉ hẹp khi hoán vị đã được tiến hoá theo `capacity_time` (quần thể cuối thiên về quy tắc này, và các hoán vị của 10 seed không độc lập nên đây là số liệu mô tả). Ngoài ra số đo này **không giải thích** vì sao f2 tốt nhất của `dp` thấp hơn 12–16%: chúng tôi không đo f2 riêng, nên đó vẫn là quan sát chưa có giải thích.
 
 **Vì sao polish hiệu quả.** Polish chỉ tốn một lần chấm lại n_pop × K cá thể ở cuối (vài giây, khoảng 6% CPU của run dài), không can thiệp vào tiến hoá nên không làm đổi quần thể (hoàn toàn trực giao với các cải tiến khác của nhóm), và thêm các điểm mà thứ tự hoán vị đã cho phép nhưng bộ giải mã tham lam không chọn (số điểm front tăng, ví dụ từ 9.7 lên 18.9 ở C102-25 sau 200 thế hệ). Phần giải thích "vì sao" này cũng là suy luận từ cơ chế, chưa kiểm riêng.
 
@@ -122,7 +133,7 @@ Cơ chế tăng pm khi trì trệ gần như không kích hoạt: ở `stagnatio
 ## 5. Hạn chế
 
 - **Cỡ mẫu nhỏ:** 10 seed cho kết quả (5 seed cho tuning), hai instance, p chưa hiệu chỉnh đa so sánh; tuning chọn trong 12 cấu hình trên cùng 5 seed nên có thiên lệch chọn lọc.
-- **Chưa chạy n = 100 (RC201-100):** `split_capacity_time` ở n = 100 vượt đội xe và đang chờ TV1 quyết định; mọi kết luận ở trên chưa áp dụng cho kích thước đó, nơi ràng buộc đội xe chạm nhiều hơn. Chi phí `dp` tham chiếu ở n = 100 (đo ở lượt thử 20 thế hệ) là khoảng 28 lần baseline, nên so sánh theo CPU càng bất lợi cho `every_eval`.
+- **Chưa chạy n = 100 (RC201-100):** `split_capacity_time` ở n = 100 vượt đội xe và đang chờ TV1 quyết định (đo trên 200 hoán vị ngẫu nhiên: `capacity_time` dùng trung bình 26.8 xe so với `fleet_size` = 25, khả thi 0%, còn `dp` nhiều lớp khả thi 100%); mọi kết luận ở trên chưa áp dụng cho kích thước đó, nơi ràng buộc đội xe chạm nhiều hơn. Chi phí `dp` tham chiếu ở n = 100 (đo ở lượt thử 20 thế hệ) là khoảng 28 lần baseline, nên so sánh theo CPU càng bất lợi cho `every_eval`.
 - **Ngân sách chưa chốt:** n_gen = 1400 và 3500 của `baseline_eqtime` do chúng tôi chọn để xấp xỉ chi phí `dp` (khoảng 0.80 và 0.97), không phải ngân sách cuối của nhóm; kết luận về polish ở "ngân sách hội tụ" cần xác nhận lại khi nhóm chốt ngân sách, kèm lượt chạy cuối trên seed 0–9.
 - **Chưa thử kết hợp** với local search của TV2 và cơ chế đa dạng của TV3; polish lấy quần thể cuối làm đầu vào nên về lý thuyết ghép được, nhưng chưa có số liệu.
 - **Đo chi phí:** hệ số CPU dp/baseline đo trên một seed, một phiên, sai số cỡ ±20–30%; thời gian tường không so được giữa các lượt chạy do tải nền.
