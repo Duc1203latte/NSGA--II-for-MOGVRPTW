@@ -122,25 +122,36 @@ Chi phí CPU: hệ số một thế hệ dp / một thế hệ baseline đo cùn
 
 Câu hỏi: `split_rule = capacity_time` của baseline có đã loại phần lớn trễ hay không (giả thuyết dùng để giải thích vì sao `dp` ít lợi)? Không chạy tiến hoá: `python -m scripts.tv4_split_lateness` tách lại cùng một tập hoán vị bằng ba cách (`capacity` = `split_greedy`, `capacity_time`, và `split_dp` với trọng số [1/3, 1/3, 1/3]) rồi chấm bằng `evaluate_routes_detail`. Tập A: 200 hoán vị ngẫu nhiên (`default_rng(0)`); tập B: 800 hoán vị của quần thể cuối `baseline` (seed 0–9, 10 x 80). Trung bình (độ lệch chuẩn nằm ở `results/tv4_main/split_lateness.md`); `late_min`, `early_min` là tổng phút trễ/sớm, F4 là phạt (giờ), "Khả thi" là tỉ lệ có số xe không vượt `fleet_size` (= 25 ở cả ba instance).
 
-| Tập | Quy tắc | F4 | late_min | early_min | Số xe | f1 | f3 | Khả thi |
-|---|---|---|---|---|---|---|---|---|
-| A: C102-25 ngẫu nhiên | capacity | 23280 | 23020 | 797 | 2.0 | 25710 | 0.134 | 1.00 |
-| | capacity_time | 1214 | 4.0 | 3630 | 10.6 | 4809 | 0.427 | 1.00 |
-| | dp | 1525 | 848 | 2031 | 6.9 | 4332 | 0.440 | 1.00 |
-| A: R201-50 ngẫu nhiên | capacity | 42130 | 41790 | 1012 | 2.0 | 50460 | 0.037 | 1.00 |
-| | capacity_time | 3101 | 23.6 | 9231 | 21.6 | 12460 | 0.270 | 1.00 |
-| | dp | 3496 | 1577 | 5757 | 13.7 | 11660 | 0.302 | 1.00 |
-| A: C102-100 ngẫu nhiên | capacity | 133800 | 133100 | 2014 | 5.0 | 152200 | 0.076 | 1.00 |
-| | capacity_time | 65660 | 62400 | 9753 | 26.8 | 85310 | 0.242 | **0.00** |
-| | dp | 9753 | 7342 | 7232 | 25.0 | 26890 | 0.407 | 1.00 |
-| B: C102-25 quần thể cuối | capacity | 13080 | 12900 | 525 | 2.0 | 14430 | 0.429 | 1.00 |
-| | capacity_time | 128 | 8.5 | 358 | 3.15 | 1493 | 0.898 | 1.00 |
-| | dp | 111 | 12.9 | 295 | 3.12 | 1469 | 0.906 | 1.00 |
-| B: R201-50 quần thể cuối | capacity | 27380 | 27090 | 890 | 2.0 | 33100 | 0.164 | 1.00 |
-| | capacity_time | 850 | 32.4 | 2452 | 7.27 | 6291 | 0.691 | 1.00 |
-| | dp | 857 | 84.0 | 2318 | 6.97 | 6263 | 0.692 | 1.00 |
+| Tập | Quy tắc | F4 | late_min | early_min | Số xe | f1 | f3 | total_km | Khả thi |
+|---|---|---|---|---|---|---|---|---|---|
+| A: C102-25 ngẫu nhiên | capacity | 23280 | 23020 | 797 | 2.0 | 25710 | 0.134 | 513.6 | 1.00 |
+| | capacity_time | 1214 | 4.0 | 3630 | 10.6 | 4809 | 0.427 | 748.2 | 1.00 |
+| | dp | 1525 | 848 | 2031 | 6.9 | 4332 | 0.440 | 609.9 | 1.00 |
+| A: R201-50 ngẫu nhiên | capacity | 42130 | 41790 | 1012 | 2.0 | 50460 | 0.037 | 1839 | 1.00 |
+| | capacity_time | 3101 | 23.6 | 9231 | 21.6 | 12460 | 0.270 | 2151 | 1.00 |
+| | dp | 3496 | 1577 | 5757 | 13.7 | 11660 | 0.302 | 1983 | 1.00 |
+| A: C102-100 ngẫu nhiên | capacity | 133800 | 133100 | 2014 | 5.0 | 152200 | 0.076 | 4040 | 1.00 |
+| | capacity_time | 65660 | 62400 | 9753 | 26.8 | 85310 | 0.242 | 4425 | **0.00** |
+| | dp | 9753 | 7342 | 7232 | 25.0 | 26890 | 0.407 | 4202 | 1.00 |
+| B: C102-25 quần thể cuối | capacity | 13080 | 12900 | 525 | 2.0 | 14430 | 0.429 | 270.6 | 1.00 |
+| | capacity_time | 128 | 8.5 | 358 | 3.15 | 1493 | 0.898 | 280.1 | 1.00 |
+| | dp | 111 | 12.9 | 295 | 3.12 | 1469 | 0.906 | 279.4 | 1.00 |
+| B: R201-50 quần thể cuối | capacity | 27380 | 27090 | 890 | 2.0 | 33100 | 0.164 | 1251 | 1.00 |
+| | capacity_time | 850 | 32.4 | 2452 | 7.27 | 6291 | 0.691 | 1313 | 1.00 |
+| | dp | 857 | 84.0 | 2318 | 6.97 | 6263 | 0.692 | 1308 | 1.00 |
 
-**Nhận xét.** Giả thuyết được dữ liệu ủng hộ. So với `capacity`, `capacity_time` giảm `late_min` từ hàng chục nghìn phút xuống còn 4–32 phút (C102-25 và R201-50, cả hoán vị ngẫu nhiên lẫn quần thể cuối), tức loại gần hết trễ. Trên quần thể cuối, nơi `dp` đang được dùng để cải thiện, `dp` chỉ hơn `capacity_time` khoảng 1.6% về f1 ở C102-25 (1469 so với 1493) và 0.4% ở R201-50 (6263 so với 6291), f3 hầu như không đổi (0.906 so với 0.898; 0.692 so với 0.691), F4 ngang nhau (111 so với 128; 857 so với 850) và `dp` thậm chí trễ nhiều hơn (12.9 so với 8.5 phút; 84 so với 32), bù lại bằng bớt đến sớm. Khoảng trống cho tách tối ưu ở quần thể đã tiến hoá vì vậy rất hẹp, khớp với lợi ích nhỏ của `dp` ở mục "Nhận xét". Hai lưu ý: (1) ở hoán vị ngẫu nhiên, `dp` hơn rõ về f1 (4332 so với 4809, 10%; 11660 so với 12460, 6%), nên khoảng trống chỉ hẹp khi hoán vị đã được tiến hoá theo `capacity_time`; quần thể cuối vốn thiên về quy tắc này nên tập B không công bằng tuyệt đối với `dp`, và các hoán vị của 10 seed không độc lập (số liệu mô tả, không kiểm định); (2) ở C102-100, `capacity_time` dùng trung bình 26.8 xe, **vượt `fleet_size` = 25 ở mọi hoán vị (khả thi 0.00)** vì quy tắc chỉ mở tuyến mới theo tải trọng khi đã hết xe, trong khi `dp` nhiều lớp luôn khả thi nhưng trễ nhiều hơn (F4 9753 so với 65660 là do `capacity_time` bị tính phạt vượt đội xe, không phải do `dp` đến muộn ít hơn). Đây là số đo cho vấn đề đội xe ở n = 100 đang chờ TV1.
+**Nhận xét.** Giả thuyết được dữ liệu ủng hộ. So với `capacity`, `capacity_time` giảm `late_min` từ hàng chục nghìn phút xuống còn 4–32 phút (C102-25 và R201-50, cả hoán vị ngẫu nhiên lẫn quần thể cuối), tức loại gần hết trễ. Trên quần thể cuối, nơi `dp` đang được dùng để cải thiện, `dp` chỉ hơn `capacity_time` khoảng 1.6% về f1 ở C102-25 (1469 so với 1493) và 0.4% ở R201-50 (6263 so với 6291), f3 hầu như không đổi (0.906 so với 0.898; 0.692 so với 0.691), F4 ngang nhau (111 so với 128; 857 so với 850) và `dp` thậm chí trễ nhiều hơn (12.9 so với 8.5 phút; 84 so với 32), bù lại bằng bớt đến sớm. Khoảng trống cho tách tối ưu ở quần thể đã tiến hoá vì vậy rất hẹp, khớp với lợi ích nhỏ của `dp` ở mục "Nhận xét". Hai lưu ý: (1) ở hoán vị ngẫu nhiên, `dp` hơn rõ về f1 (4332 so với 4809, 10%; 11660 so với 12460, 6%), nên khoảng trống chỉ hẹp khi hoán vị đã được tiến hoá theo `capacity_time`; quần thể cuối vốn thiên về quy tắc này nên tập B không công bằng tuyệt đối với `dp`, và các hoán vị của 10 seed không độc lập (số liệu mô tả, không kiểm định); (2) ở C102-100, `capacity_time` dùng trung bình 26.8 xe, **vượt `fleet_size` = 25 ở mọi hoán vị (khả thi 0.00)**. F4 chỉ gồm phạt đến sớm/muộn (xem `evaluate_routes_detail`), không có phạt vượt đội xe; vượt đội xe chỉ là CV trong `nsga2.py`. Con số F4 và `late_min` lớn của `capacity_time` là trễ thật: quy tắc ngừng cắt theo thời gian khi chỉ còn một xe (`fleet_left`), rồi dồn mọi khách còn lại vào các tuyến cuối (chỉ còn cắt theo tải trọng), nên vừa vượt đội xe vừa trễ rất nhiều. `dp` nhiều lớp thì luôn khả thi (đúng 25 xe) và **trễ ít hơn khoảng 8.5 lần** (7342 so với 62400 phút), f1 thấp hơn khoảng 3.2 lần (26890 so với 85310), f3 cao hơn (0.407 so với 0.242), total_km thấp hơn (4202 so với 4425). Vì vậy n = 100 là cấu hình mà `dp` chấm mọi cá thể **có thể thực sự đáng giá**, trái với n = 25 và 50 (chưa được kiểm bằng tiến hoá, và còn chờ TV1 sửa hoặc quyết định về `split_capacity_time` ở n = 100: nếu sửa quy tắc đó thì khoảng cách này có thể thu hẹp). Đây là số đo cho vấn đề đội xe ở n = 100 đang chờ TV1.
+
+**Vì sao `dp` có f2 tốt nhất thấp hơn (12–16%).** f2 bằng một hằng số nhân với `total_km` (xem `evaluate_routes_detail`), nên chỉ cần so `total_km`. Cột `total_km` ở bảng trên cho thấy với trọng số đều [1/3, 1/3, 1/3] `dp` chỉ khác `capacity_time` rất ít ở quần thể cuối (280.1 so với 279.4 km ở C102-25; 1313 so với 1308 ở R201-50). Khi đẩy trọng số về f2 thuần [0, 1, 0] trên 50 hoán vị ngẫu nhiên (cùng `default_rng(0)`, `split_dp` so với `split_capacity_time`):
+
+| Instance | Quy tắc | total_km | Số xe | Khách mỗi tuyến | f2 (kg) | Số hoán vị `dp` có km thấp hơn |
+|---|---|---|---|---|---|---|
+| C102-25 | capacity_time | 749.5 ± 56.2 | 10.44 | 2.42 | 509.2 | |
+| | dp [0, 1, 0] | 495.4 ± 42.5 (−33.9%) | 2.00 | 12.50 | 336.6 | 50/50 |
+| R201-50 | capacity_time | 2136.8 ± 92.5 | 21.22 | 2.37 | 1451.9 | |
+| | dp [0, 1, 0] | 1800.4 ± 110.6 (−15.7%) | 2.72 | 19.00 | 1223.3 | 50/50 |
+
+`dp` với trọng số nghiêng về f2 tạo ra **ít tuyến hơn và dài hơn** (2–3 xe thay vì 10–21) và `total_km` thấp hơn ở cả 50/50 hoán vị; vì f2 tỉ lệ với `total_km`, f2 thấp hơn cùng tỉ lệ (−33.9% và −15.7%). Cơ chế này giải thích hướng và độ lớn của f2 tốt nhất thấp hơn của `dp` (−16% C102-25, −12% R201-50 ở `tv4_main`; R201-50 khớp gần với −15.7%, còn C102-25 nhỏ hơn nhiều so với −33.9% vì các hoán vị đã tiến hoá chịu ràng buộc khung giờ mà phép đo f2 thuần bỏ qua, và phép đo ở đây là hoán vị ngẫu nhiên, không phải front thật). Lưu ý đánh đổi: tuyến dài như vậy trễ nhiều (f2 thuần không tính trễ), nên chỉ lợi cho đầu f2 của front, khớp với f1 và f3 tốt nhất của `dp` không tốt hơn.
 
 ## Tuning (giai đoạn 3, seed tuning 100–104)
 
