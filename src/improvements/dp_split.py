@@ -9,14 +9,13 @@ from __future__ import annotations
 import logging
 import numpy as np
 from src.decoder import (
-    MINUTES_PER_HOUR, emission_factor, evaluate_routes_detail, satisfaction, split_greedy,
+    MINUTES_PER_HOUR, emission_factor, evaluate_routes_detail, satisfaction, split, split_greedy,
 )
 from src.instance import Instance, load_config
 
 log = logging.getLogger(__name__)
 
 EPS = 1e-9                                   # san duoi cho he so chuan hoa
-_scales_cache: dict[tuple[str, int], np.ndarray] = {}
 _warned_infeasible = False                   # chi canh bao mot lan
 
 
@@ -28,6 +27,7 @@ class _RouteState:
         self.inst = inst
         self.cost = p["cost"]
         self.v = p["speed_kmh"]
+        self.sat_at_arrival = p["satisfaction_time"] == "arrival"   # giong evaluate_routes_detail
         self.slope = (self.cost["rho_star"] - self.cost["rho0"]) / inst.capacity
         self.k_emit = emission_factor(p) / p["emission"]["grams_per_kg"]
         self.reset()
@@ -57,8 +57,10 @@ class _RouteState:
         eta, ltb = inst.tw_expected[c]
         self.early += max(eta - arrive, 0.0)
         self.late += max(arrive - ltb, 0.0)
-        self.g3 += 1.0 - satisfaction(arrive, et, eta, ltb, lt) / 100.0
-        self.t = max(arrive, eta) + inst.service_time[c]
+        start = max(arrive, eta)                      # cho toi ETa roi moi do hang
+        t_sat = arrive if self.sat_at_arrival else start
+        self.g3 += 1.0 - satisfaction(t_sat, et, eta, ltb, lt) / 100.0
+        self.t = start + inst.service_time[c]
         self.prev = c
 
     def terms(self) -> tuple[float, float, float]:
@@ -105,34 +107,37 @@ def child_weights(rng, parent_a_weights, parent_b_weights, params: dict) -> np.n
     raise ValueError(f"weight_inherit = {mode!r} chua duoc ho tro")
 
 
-def _nearest_neighbor(inst: Instance) -> list[int]:
-    left = set(range(1, inst.n + 1))
+def _greedy_order(inst: Instance, key) -> list[int]:
+    """Di tuan tu tu kho, moi buoc chon khach chua tham co key nho nhat."""
+    left = list(range(1, inst.n + 1))
     cur, out = 0, []
     while left:
-        nxt = min(left, key=lambda c: (inst.dist[cur, c], c))
+        nxt = min(left, key=lambda c: key(cur, c))
         out.append(nxt)
         left.remove(nxt)
         cur = nxt
     return out
 
 
-def objective_scales(inst: Instance) -> np.ndarray:
-    """He so chuan hoa co dinh. f1, f2: trung binh tren 3 hoan vi tat dinh (greedy split).
-    g3 da nam trong [0,1] nen he so lay tu config (g3_scale)."""
-    key = (inst.name, inst.n)
-    if key in _scales_cache:
-        return _scales_cache[key]
-    idx = np.arange(1, inst.n + 1)
-    by_eta = sorted(idx.tolist(), key=lambda c: (inst.tw_expected[c, 0], inst.dist[0, c], c))
-    perms = [idx.tolist(), by_eta, _nearest_neighbor(inst)]
+def objective_scales(inst: Instance, g3_scale: float | None = None) -> np.ndarray:
+    """He so chuan hoa (f1, f2, g3), tat dinh, khong RNG, KHONG cache toan cuc.
+    f1, f2: trung binh tren 3 hoan vi tat dinh (thu tu ID, nearest-neighbor, theo ETa) cham bang
+    split() that cua decoder (split_rule trong config), khop reference_scales cua TV2.
+    g3 = 1 - f3 da nam trong [0,1] nen he so lay tu config; truyen g3_scale de khong doc lai file.
+    Goi mot lan moi run roi truyen scales vao evaluate_dp/split_dp."""
+    if g3_scale is None:
+        g3_scale = load_config()["improvements"]["dp_split_params"]["g3_scale"]
+    eta = inst.tw_expected[:, 0]
+    perms = [
+        list(range(1, inst.n + 1)),
+        _greedy_order(inst, lambda cur, c: (inst.dist[cur, c], c)),
+        _greedy_order(inst, lambda cur, c: (eta[c], inst.dist[cur, c], c)),
+    ]
     vals = []
     for p in perms:
-        d = evaluate_routes_detail(split_greedy(p, inst), inst)
+        d = evaluate_routes_detail(split(p, inst), inst)
         vals.append((d["f1"], d["f2"]))
-    g3_scale = load_config()["improvements"]["dp_split_params"]["g3_scale"]
-    scales = np.maximum(np.append(np.mean(vals, axis=0), g3_scale), EPS)
-    _scales_cache[key] = scales
-    return scales
+    return np.maximum(np.append(np.mean(vals, axis=0), g3_scale), EPS)
 
 
 def _build_arcs(perm, inst: Instance, weights, scales) -> list[list[tuple[int, float]]]:
@@ -212,7 +217,8 @@ def _backtrack_1d(pred: list[int], n: int) -> list[int]:
 
 
 def evaluate_dp(perm: list[int], inst: Instance, weights, scales=None) -> dict:
-    """Split DP roi di qua duong danh gia chinh thuc evaluate_routes_detail."""
+    """Split DP roi di qua duong danh gia chinh thuc evaluate_routes_detail.
+    Nen truyen scales tinh san (objective_scales) moi run; scales=None tinh lai moi lan goi (cham)."""
     if scales is None:
         scales = objective_scales(inst)
     routes = split_dp(perm, inst, weights, scales)

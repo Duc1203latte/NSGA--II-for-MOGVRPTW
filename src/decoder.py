@@ -1,5 +1,5 @@
-"""Nhận một hoán vị, cắt thành các tuyến, đi dọc từng tuyế để 
-tính giờ đến và tải trọng rồi ra3 mục tiêu"""
+"""Nhận một hoán vị, cắt thành các tuyến, đi dọc từng tuyến để 
+tính giờ đến và tải trọng rồi ra 3 mục tiêu"""
 
 from __future__ import annotations
 import numpy as np
@@ -12,7 +12,12 @@ def evaluate(perm: list[int], inst: Instance) -> tuple[float, float, float]:
     return float(d["f1"]), float(d["f2"]), float(d["f3"])
 
 def evaluate_detail(perm: list[int], inst: Instance) -> dict:
-    return evaluate_routes_detail(split_greedy(perm, inst), inst)
+    return evaluate_routes_detail(split(perm, inst), inst)
+
+def split(perm: list[int], inst: Instance) -> list[list[int]]:
+    if inst.params["split_rule"] == "capacity":
+        return split_greedy(perm, inst)
+    return split_capacity_time(perm, inst)
 
 def split_greedy(perm: list[int], inst: Instance) -> list[list[int]]:
     '''Đi dọc hoán vị, cộng dồn demand, quá tải trọng thì mở tuyến mới'''
@@ -26,6 +31,33 @@ def split_greedy(perm: list[int], inst: Instance) -> list[list[int]]:
             current, load = [], 0.0
         current.append(c)
         load += d
+    if current:
+        routes.append(current)
+    return routes
+
+def split_capacity_time(perm: list[int], inst: Instance) -> list[list[int]]:
+    """Đi dọc hoán vị, mở tuyến mới khi:
+    - thêm khách sẽ vượt tải trọng (luôn bắt buộc), hoặc
+    - xe sẽ đến khách sau LT, mà đội xe vẫn còn xe trống.
+    Giờ đến tính đúng như evaluate_routes_detail: chờ tới ETa, cộng thời gian dỡ hàng.
+    """
+    v = inst.params["speed_kmh"]
+    routes: list[list[int]] = []
+    current: list[int] = []
+    load, t, prev = 0.0, inst.depart_time, 0
+    for c in perm:
+        arrive = t + inst.dist[prev, c] / v * MINUTES_PER_HOUR
+        over_capacity = load + inst.demand[c] > inst.capacity
+        too_late = arrive > inst.tw_specified[c, 1]
+        fleet_left = inst.fleet_size is None or len(routes) + 1 < inst.fleet_size
+        if current and (over_capacity or (too_late and fleet_left)):
+            routes.append(current)
+            current, load, t, prev = [], 0.0, inst.depart_time, 0
+            arrive = t + inst.dist[0, c] / v * MINUTES_PER_HOUR
+        current.append(c)
+        load += inst.demand[c]
+        t = max(arrive, inst.tw_expected[c, 0]) + inst.service_time[c]
+        prev = c
     if current:
         routes.append(current)
     return routes
@@ -60,6 +92,7 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
     _check_routes(routes, inst)
     cost = inst.params["cost"]
     v = inst.params["speed_kmh"]
+    sat_at_arrival = inst.params["satisfaction_time"] == "arrival"
     fuel_slope = (cost["rho_star"] - cost["rho0"]) / inst.capacity  # L/km trên mỗi kg hàng
 
     fuel_l = 0.0       # tổng lít nhiên liệu, dùng cho F1
@@ -89,9 +122,13 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
 
             early_min += max(eta - arrive, 0.0)
             late_min += max(arrive - ltb, 0.0)
-            sat_sum += satisfaction(arrive, et, eta, ltb, lt)  # W tính theo GIỜ ĐẾN (mục 4.1)
+            #sat_sum += satisfaction(arrive, et, eta, ltb, lt)  # W tính theo GIỜ ĐẾN (mục 4.1)
 
-            t = max(arrive, eta) + inst.service_time[c]         # đến sớm thì chờ tới ETa rồi mới dỡ hàng
+            #t = max(arrive, eta) + inst.service_time[c]         # đến sớm thì chờ tới ETa rồi mới dỡ hàng
+            start = max(arrive, eta)
+            t_sat = arrive if sat_at_arrival else start
+            sat_sum += satisfaction(t_sat, et, eta, ltb, lt)
+            t = start + inst.service_time[c]
             load -= inst.demand[c]
             prev = c
 
@@ -117,6 +154,7 @@ def evaluate_routes_detail(routes: list[list[int]], inst: Instance) -> dict:
         "route_loads": route_loads,
         "arrival_times": arrival,
         "n_vehicles": len(routes),
+        "satisfaction_time": inst.params["satisfaction_time"],
         "fleet_ok": inst.fleet_size is None or len(routes) <= inst.fleet_size,  # ràng buộc C5
         "total_km": total_km,
         "early_min": early_min,

@@ -9,7 +9,8 @@ Dành cho TV1/TV2. Hai cải tiến độc lập, mỗi cái một cờ trong `c
 | `src/improvements/dp_split.py` | `evaluate_dp(perm, inst, weights, scales=None) -> dict` | split tối ưu (Prins) rồi chấm bằng `evaluate_routes_detail`; thêm khoá `weights`, `split="dp"` |
 | | `sample_weights(rng, params) -> ndarray(3)` | trọng số cho cá thể mới; `params` = `cfg["improvements"]["dp_split_params"]` |
 | | `child_weights(rng, wa, wb, params) -> ndarray(3)` | trọng số cho con theo `weight_inherit` |
-| | `split_dp`, `objective_scales(inst)` | `scales` tất định, cache theo instance, không RNG |
+| | `objective_scales(inst, g3_scale=None)` | `scales` tất định, không RNG, **không cache toàn cục**: f1, f2 = trung bình trên 3 hoán vị (ID, NN, ETa) chấm bằng `decoder.split()` (khớp `reference_scales` của TV2), g3 = `g3_scale`. **Tính một lần mỗi run** rồi truyền vào `evaluate_dp(..., scales)`; truyền `g3_scale` từ cfg đang chạy |
+| | `split_dp` | theo `satisfaction_time` của instance (`arrival` / `service_start`) giống `evaluate_routes_detail` |
 | `src/improvements/adaptive.py` | `resolve_params(adaptive_params, nsga2_cfg, case29)` | gộp khoảng pc/pm + pc/pm gốc thành dict phẳng |
 | | `adaptive_rates(rank_a, rank_b, max_rank, params, front1_fraction, pm_boost=1.0) -> (pc, pm)` | pc/pm theo hạng cha mẹ tốt hơn |
 | | `StagnationTracker(stagnation_gens, boost)` | `update(front1_objs)` trả hệ số nhân pm |

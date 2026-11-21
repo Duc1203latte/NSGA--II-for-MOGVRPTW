@@ -10,6 +10,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
+SATISFACTION_TIMES = ("arrival", "service_start")
+SPLIT_RULES = ("capacity", "capacity_time")
 
 @dataclass
 class Instance:
@@ -34,8 +36,9 @@ def euclidean_matrix(coords: np.ndarray) -> np.ndarray:
     diff = coords[:, None, :] - coords[None, :, :]
     return np.hypot(diff[...,0], diff[...,1])
 
-def load_instance(name: str, n: int) -> Instance:
-    cfg = load_config()
+def load_instance(name: str, n: int, cfg: dict | None = None) -> Instance:
+    if cfg is None:
+        cfg = load_config()
     if name.lower() == "case29":
         inst = _load_case29(n, cfg)
     else:
@@ -44,10 +47,18 @@ def load_instance(name: str, n: int) -> Instance:
     return inst
 
 def _model_params(cfg: dict) -> dict:
+    sat_time = cfg["satisfaction_time"]
+    if sat_time not in SATISFACTION_TIMES:
+        raise ValueError(f"satisfaction_time = {sat_time!r}, chỉ nhận {SATISFACTION_TIMES}")
+    split_rule = cfg["split_rule"]
+    if split_rule not in SPLIT_RULES:
+        raise ValueError(f"split_rule = {split_rule!r}, chỉ nhận {SPLIT_RULES}")
     return {
         "cost": cfg["cost"],
         "speed_kmh": cfg["speed_kmh"],
         "emission": cfg["emission"],
+        "satisfaction_time": sat_time,
+        "split_rule": split_rule,
     }
 
 def _depart_time(mode: str, tw_expected: np.ndarray) -> float:
@@ -128,4 +139,4 @@ def _check_instance(inst: Instance) -> None:
     et, eta = inst.tw_specified[:, 0], inst.tw_expected[:, 0]
     ltb, lt = inst.tw_expected[:, 1], inst.tw_specified[:, 1]
     if not np.all((et <= eta) & (eta <= ltb) & (ltb <= lt)):
-        raise ValueError(f"{inst.name}: hai khung giờ lồng nhau ET <= ETa <= LTb <= LT")
+        raise ValueError(f"{inst.name}: hai khung giờ không lồng nhau ET <= ETa <= LTb <= LT")
