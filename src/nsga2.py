@@ -1,6 +1,7 @@
 """NSGA_II baseline cho MGVRPTW"""
 
 from __future__ import annotations
+import time
 import numpy as np
 from src.decoder import evaluate_detail
 from src.instance import Instance
@@ -8,12 +9,18 @@ from src.instance import Instance
 CROSSOVERS = ("ox", "obx")
 MUTATIONS = ("standard", "always")
 
-def evaluate_population(pop: list[np.ndarray], inst: Instance) -> tuple[np.ndarray, np.ndarray]:
-    '''Trả về F (N x 3, cả ba cực tiểu) và CV (N,) = số xe vượt giới hạn'''
+def evaluate_population(pop: list[np.ndarray], inst: Instance, W: np.ndarray | None = None,
+                        scales: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
+    '''Trả về F (N x 3, cả ba cực tiểu) và CV (N,) = số xe vượt giới hạn.
+    W (N x 3) khác None chỉ khi dp_split bật: chấm từng cá thể bằng evaluate_dp với trọng số của nó.'''
     F = np.empty((len(pop), 3))
     CV = np.zeros(len(pop))
     for i, perm in enumerate(pop):
-        d = evaluate_detail(perm.tolist(), inst)
+        if W is None:
+            d = evaluate_detail(perm.tolist(), inst)
+        else:  # --- TV4 dp_split
+            from src.improvements.dp_split import evaluate_dp
+            d = evaluate_dp(perm.tolist(), inst, W[i], scales)
         F[i] = (d["f1"], d["f2"], 1.0 - d["f3"])
         if inst.fleet_size is not None:
             CV[i] = max(0, d["n_vehicles"] - inst.fleet_size)
@@ -150,20 +157,35 @@ def mutation_rate(inst: Instance, cfg: dict) -> float:
     return pm["case29"] if inst.name.startswith("case29") else pm["solomon"]
 
 def make_offspring(pop: list[np.ndarray], rank: np.ndarray, crowd: np.ndarray,
-                   cfg: dict, pm: float, rng: np.random.Generator) -> list[np.ndarray]:
+                   cfg: dict, pm: float, rng: np.random.Generator,
+                   W: np.ndarray | None = None, rate_fn=None,
+                   child_W_out: list | None = None) -> list[np.ndarray]:
+    """W, rate_fn, child_W_out chỉ dùng khi bật cải tiến TV4; để mặc định thì đi đúng đường baseline.
+    rate_fn(rank_p1, rank_p2) -> (pc, pm) cho mỗi cặp ghép (adaptive_rates).
+    child_W_out: list nhận trọng số DP của từng con (cùng thứ tự với children)."""
     p = cfg["nsga2"]
     cross = ox if p["crossover"] == "ox" else obx
     children: list[np.ndarray] = []
     while len(children) < len(pop):
-        p1 = pop[tournament(rank, crowd, p["tournament_size"], rng)]
-        p2 = pop[tournament(rank, crowd, p["tournament_size"], rng)]
-        if rng.random() < p["pc"]:
+        i1 = tournament(rank, crowd, p["tournament_size"], rng)
+        i2 = tournament(rank, crowd, p["tournament_size"], rng)
+        p1, p2 = pop[i1], pop[i2]
+        pc_pair, pm_pair = p["pc"], pm
+        if rate_fn is not None:  # --- TV4 adaptive_rates
+            pc_pair, pm_pair = rate_fn(rank[i1], rank[i2])
+        if rng.random() < pc_pair:
             c1, c2 = cross(p1, p2, rng), cross(p2, p1, rng)
         else:
             c1, c2 = p1.copy(), p2.copy()
         for c in (c1, c2):
-            mutate(c, pm, p["mutation"], rng)
+            mutate(c, pm_pair, p["mutation"], rng)
+            if child_W_out is not None:  # --- TV4 dp_split: trọng số con, sau đột biến, trước LS/chấm
+                from src.improvements.dp_split import child_weights
+                child_W_out.append(child_weights(rng, W[i1], W[i2],
+                                                 cfg["improvements"]["dp_split_params"]))
             children.append(c)
+    if child_W_out is not None:
+        del child_W_out[len(pop):]
     return children[: len(pop)]
 
 def check_config(cfg: dict) -> None:
@@ -175,14 +197,33 @@ def check_config(cfg: dict) -> None:
 
 def run(inst: Instance, cfg: dict, seed: int) -> dict:
     '''Chạy NSGA-II một lần'''
+    t_start = time.perf_counter()
     check_config(cfg)
     p = cfg["nsga2"]
     n_pop, n_gen = p["n_pop"], p["n_gen"]
     pm = mutation_rate(inst, cfg)
     rng = np.random.default_rng(seed)
+    imp = cfg.get("improvements", {})
+    use_dp, use_adaptive = bool(imp.get("dp_split", False)), bool(imp.get("adaptive_rates", False))
 
     pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
-    F, CV = evaluate_population(pop, inst)
+    # --- TV4 dp_split: trọng số khởi tạo, bốc SAU các hoán vị để dãy hoán vị giống baseline.
+    # W song song với pop (N x 3): đi theo pop qua khởi tạo, con cái, merged và chỉ số keep.
+    W = scales = None
+    n_dp_calls = 0
+    if use_dp:
+        from src.improvements.dp_split import objective_scales, sample_weights
+        dp_params = imp["dp_split_params"]
+        W = np.array([sample_weights(rng, dp_params) for _ in range(n_pop)])
+        scales = objective_scales(inst, dp_params["g3_scale"])   # một lần mỗi run
+        n_dp_calls += n_pop
+    # --- TV4 adaptive_rates: tham số và tracker, một lần mỗi run
+    rate_log = []
+    if use_adaptive:
+        from src.improvements.adaptive import StagnationTracker, adaptive_rates, resolve_params
+        ad_params = resolve_params(imp["adaptive_params"], p, case29=inst.name.startswith("case29"))
+        tracker = StagnationTracker(ad_params["stagnation_gens"], ad_params["boost"])
+    F, CV = evaluate_population(pop, inst, W, scales)
     n_evals = n_pop
     history = []
 
@@ -190,16 +231,37 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         rank, crowd = rank_and_crowding(F, CV)
         history.append(F[rank == 0].copy())
 
-        children = make_offspring(pop, rank, crowd, cfg, pm, rng)
-        F_child, CV_child = evaluate_population(children, inst)
+        rate_fn, pcs, pms = None, [], []
+        if use_adaptive:  # --- TV4 adaptive_rates: pc/pm theo hạng cha mẹ từng cặp
+            front1_fraction = float(np.mean(rank == 0))
+            boost = tracker.update(F[rank == 0])
+            max_rank = int(rank.max())
+
+            def rate_fn(rank_a, rank_b):
+                pc_, pm_ = adaptive_rates(rank_a, rank_b, max_rank, ad_params, front1_fraction, boost)
+                pcs.append(pc_)
+                pms.append(pm_)
+                return pc_, pm_
+
+        child_W = [] if use_dp else None
+        children = make_offspring(pop, rank, crowd, cfg, pm, rng, W, rate_fn, child_W)
+        W_child = np.array(child_W) if use_dp else None
+        F_child, CV_child = evaluate_population(children, inst, W_child, scales)
         n_evals += len(children)
+        if use_dp:
+            n_dp_calls += len(children)
+        if use_adaptive:
+            rate_log.append({"front1_fraction": front1_fraction, "pc": pcs, "pm": pms})
 
         merged = pop + children
         F_all = np.vstack([F, F_child])
         CV_all = np.concatenate([CV, CV_child])
+        # Loại trùng chỉ so byte của hoán vị: cùng hoán vị khác trọng số DP vẫn tính là trùng.
         keep = select_survivors(merged, F_all, CV_all, n_pop, p["eliminate_duplicates"])
         pop = [merged[i] for i in keep]
         F, CV = F_all[keep], CV_all[keep]
+        if use_dp:  # --- TV4 dp_split: W đi theo keep, luôn thẳng hàng với pop
+            W = np.vstack([W, W_child])[keep]
 
     rank, _ = rank_and_crowding(F, CV)
     history.append(F[rank == 0].copy())
@@ -213,4 +275,11 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         "n_evals": n_evals,
         "seed": seed,
         "pm": pm,
+        # --- TV4: thông tin thêm, không ảnh hưởng thuật toán
+        "W": W,                     # trọng số DP (N x 3) thẳng hàng với pop; None khi dp_split tắt
+        "n_dp_calls": n_dp_calls,
+        "rate_log": rate_log,       # mỗi thế hệ {"front1_fraction", "pc": [...], "pm": [...]}
+        "feasible_frac_pop": float(np.mean(CV == 0)),     # tỉ lệ nghiệm không vượt đội xe
+        "feasible_frac_front": float(np.mean(CV[front] == 0)),
+        "wall_time_s": time.perf_counter() - t_start,
     }
