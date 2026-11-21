@@ -165,12 +165,65 @@ Mỗi ô: trung bình ± độ lệch chuẩn qua 5 seed; p-value Wilcoxon rank-
 - **`adaptive_rates`.** `adapt_v1` (khoảng đặt tâm ở baseline) không còn gây suy giảm như bản mặc định ở `tv4_main` (R201-50: ΔHV −0.005, p = 0.602, so với −0.091, p = 0.001 ở `tv4_main`) nhưng cũng không cải thiện (C102-25 +0.012, p = 0.754, độ lệch chuẩn lớn). Cơ chế tăng pm khi trì trệ gần như **không bao giờ kích hoạt**: ở g10, boost chỉ chạy 0–15 trên 200 thế hệ mỗi run ở C102-25 và 0 thế hệ ở R201-50; ở g20 là 0 ở cả hai. Lý do là front 1 gần như đổi sau mỗi thế hệ (chỉ cần một vector không trội mới), nên điều kiện "không đổi k thế hệ" hầu như không xảy ra. Hệ quả: cả bốn cấu hình v2 cho **đúng từng chữ số** kết quả của baseline trên R201-50 (và hai trong bốn trên C102-25), `adapt_v3` thực chất bằng `adapt_v1`, và các chênh lệch nhỏ còn lại ở C102-25 (±0.006) là nhiễu. Để cơ chế này có tác dụng cần đổi tiêu chí trì trệ (ví dụ ngưỡng cải thiện HV), việc đó nằm ngoài phần tuning tham số.
 - **Giới hạn.** 5 seed, hai instance, chọn trong 12 cấu hình trên cùng các seed tuning (nên có thiên lệch chọn lọc), n_gen = 200 chưa chốt. Bảng chỉ để chọn tham số, kết luận phải dựa trên lượt chạy cuối với seed 0–9.
 
-### Khuyến nghị (chưa áp dụng vào `config.yaml`)
+Khuyến nghị cuối cùng (đã cập nhật sau mục "Polish at a converged budget") nằm ở mục "Recommendations" bên dưới.
 
-| Cờ | Đề xuất | Lý do (một dòng) |
+## Polish at a converged budget
+
+Câu hỏi: lợi ích của polish (K = 10) có còn khi baseline đã chạy lâu, hay chỉ là che khuyết điểm của ngân sách ngắn? Không chạy lại tiến hoá: `scripts/tv4_polish_offline.py` áp dụng đúng thủ tục `mode=polish` lên quần thể cuối đã lưu của `tv4_main` (baseline 200 thế hệ, `baseline_eqtime` 1400 và 3500 thế hệ; seed 0–9), lưu thành hai cấu hình mới `baseline_polish` và `baseline_eqtime_polish`.
+
+- **Cùng một đoạn code với đường chạy trực tiếp.** Tôi tách bước polish khỏi `nsga2.run` thành hàm `nsga2.polish_front` (hành vi không đổi, test cũ vẫn qua); cả `mode=polish` lẫn script ngoại tuyến đều gọi hàm đó.
+- **Chứng minh khớp.** Trước khi xử lý, script polish lại các run `baseline` của `tv4_tune` (2 instance x seed 100–104) với K = 10 và K = 30 rồi so **từng bit** (hoán vị, F, CV, W, front, `n_evals`, `n_dp_calls`) với 20 run `dp_polish_k10` / `dp_polish_k30` đã lưu do code chạy trực tiếp (trước khi tách hàm) sinh ra; khớp cả 20. Có thêm `tests/test_polish_offline.py`.
+- **Reference set mới.** Bảng dưới gộp front của 7 cấu hình (thêm hai cấu hình đã polish) trên mỗi instance, nên **HV/IGD ở đây không so được với các bảng trước trong tài liệu này** (các bảng đó dùng reference set 5 hoặc 12 cấu hình khác).
+- **Kiểm định.** So cấu hình đã polish với bản chưa polish **cùng seed**, nên dùng Wilcoxon signed-rank (kiểm định cặp), hai phía. Với 10 cặp, p nhỏ nhất có thể là khoảng 0.002, đạt được khi cả 10 seed cùng một chiều.
+
+### Kết quả
+
+| Instance | Cấu hình | n_gen | HV | ΔHV so với bản chưa polish (cặp) | p (HV), signed-rank | IGD | ΔIGD so với bản chưa polish (cặp) | p (IGD), signed-rank | Số điểm front | CPU của bước polish (s/run) | Khả thi (front) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| C102-25 | baseline | 200 | 0.8469 ± 0.1638 | — | — | 0.3140 ± 0.0877 | — | — | 9.7 | — | 1.00 |
+| C102-25 | baseline_polish | 200 | 0.9207 ± 0.1476 | +0.0738 ± 0.0463 | 0.002 | 0.2272 ± 0.0854 | -0.0868 ± 0.0225 | 0.002 | 18.9 | 2.2 | 1.00 |
+| C102-25 | baseline_eqtime | 1400 | 1.0863 ± 0.0726 | — | — | 0.2058 ± 0.0269 | — | — | 34.4 | — | 1.00 |
+| C102-25 | baseline_eqtime_polish | 1400 | 1.1379 ± 0.0696 | +0.0516 ± 0.0328 | 0.002 | 0.1092 ± 0.0404 | -0.0966 ± 0.0281 | 0.002 | 38.3 | 2.4 | 1.00 |
+| C102-25 | dp | 200 | 0.9362 ± 0.1420 | — | — | 0.2142 ± 0.0749 | — | — | 19.0 | — | 1.00 |
+| C102-25 | adapt | 200 | 0.8103 ± 0.1885 | — | — | 0.3287 ± 0.1109 | — | — | 7.9 | — | 1.00 |
+| C102-25 | both | 200 | 0.9834 ± 0.1660 | — | — | 0.2022 ± 0.0955 | — | — | 18.0 | — | 1.00 |
+| R201-50 | baseline | 200 | 0.7028 ± 0.0521 | — | — | 0.2739 ± 0.0337 | — | — | 19.7 | — | 1.00 |
+| R201-50 | baseline_polish | 200 | 0.7476 ± 0.0539 | +0.0448 ± 0.0213 | 0.002 | 0.2598 ± 0.0349 | -0.0141 ± 0.0043 | 0.002 | 38.4 | 8.4 | 1.00 |
+| R201-50 | baseline_eqtime | 3500 | 1.1268 ± 0.0516 | — | — | 0.0545 ± 0.0195 | — | — | 80.0 | — | 1.00 |
+| R201-50 | baseline_eqtime_polish | 3500 | 1.1451 ± 0.0467 | +0.0183 ± 0.0099 | 0.002 | 0.0408 ± 0.0189 | -0.0137 ± 0.0046 | 0.002 | 87.4 | 8.7 | 1.00 |
+| R201-50 | dp | 200 | 0.7281 ± 0.0615 | — | — | 0.2758 ± 0.0493 | — | — | 34.0 | — | 1.00 |
+| R201-50 | adapt | 200 | 0.6177 ± 0.0358 | — | — | 0.3370 ± 0.0351 | — | — | 21.6 | — | 1.00 |
+| R201-50 | both | 200 | 0.7114 ± 0.0875 | — | — | 0.2895 ± 0.0665 | — | — | 32.4 | — | 1.00 |
+
+Các hàng `dp`, `adapt`, `both` (200 thế hệ) chỉ để tham khảo trong cùng reference set. "CPU của bước polish" là thời gian CPU của riêng bước polish, chạy tuần tự.
+
+### Polish so với dùng cùng chi phí CPU cho thêm thế hệ
+
+| Instance | Ngân sách B (thế hệ) | CPU polish (s) | = thế hệ baseline | HV polish − HV chưa polish | HV thêm nếu dùng cùng CPU cho thế hệ | p (HV), signed-rank, polish so với thế hệ thêm |
+|---|---|---|---|---|---|---|
+| C102-25 | 200 | 2.2 | 82 | 0.0738 ± 0.0463 | 0.0528 ± 0.0421 (HV(282) − HV(200)) | 0.432 |
+| C102-25 | 1400 | 2.4 | 88 | 0.0516 ± 0.0328 | 0.0007 ± 0.0015 (HV(1400) − HV(1312) (ước lượng)) | 0.002 |
+| R201-50 | 200 | 8.4 | 205 | 0.0448 ± 0.0213 | 0.1490 ± 0.0483 (HV(405) − HV(200)) | 0.002 |
+| R201-50 | 3500 | 8.7 | 211 | 0.0183 ± 0.0099 | 0.0073 ± 0.0058 (HV(3500) − HV(3289) (ước lượng)) | 0.049 |
+
+Chi phí một thế hệ baseline lấy từ `tv4_tune/cpu_cost.csv` (baseline, 200 thế hệ, CPU tuần tự: khoảng 27 ms ở C102-25 và 41 ms ở R201-50). Vì `history[g]` của run `baseline_eqtime` chính là run baseline `n_gen = g` cùng seed, HV ở "B + thế hệ thêm" được tính trực tiếp từ dữ liệu đã lưu. Ở ngân sách dài nhất không có thế hệ sau B, nên dùng HV(B) − HV(B − g) làm giá trị biên của g thế hệ cuối; ước lượng này nghiêng về phía có lợi cho việc chạy thêm thế hệ (lợi ích mỗi thế hệ giảm dần), tức là bất lợi cho polish.
+
+### Đọc kết quả
+
+- **Lợi ích vẫn còn ở ngân sách đã hội tụ.** Cả 10 seed đều tốt lên cả về HV lẫn IGD ở mọi ngân sách và cả hai instance (p = 0.002 ở cả 8 phép so cặp).
+- **ΔHV giảm khi ngân sách dài:** C102-25 từ +0.074 xuống +0.052 (giảm khoảng 30%), R201-50 từ +0.045 xuống +0.018 (giảm khoảng 59%). **ΔIGD tuyệt đối giữ hoặc tăng nhẹ:** C102-25 từ −0.087 lên −0.097, R201-50 từ −0.0141 còn −0.0137; tính theo tỉ lệ IGD thì mức cải thiện **tăng**: C102-25 từ 28% lên 47%, R201-50 từ 5% lên 25%. Số điểm thêm vào front giảm (C102-25: +9.2 xuống +3.9; R201-50: +18.7 xuống +7.4), vì front đã dày hơn. Tóm lại: mức tăng HV tuyệt đối co lại, mức hội tụ về front (IGD) thì không, và HV chưa thể tách hai ảnh hưởng này.
+- **Chi phí gần như không đổi theo ngân sách:** 2.2–2.4 s/run ở C102-25 và 8.4–8.7 s/run ở R201-50 (tỉ lệ với 80 hoán vị x K lời gọi DP). Đó là khoảng 41% (C102-25) và 102% (R201-50) CPU của baseline 200 thế hệ, nhưng chỉ khoảng 6% CPU của run dài.
+- **So với việc chạy thêm thế hệ.** Ở 200 thế hệ polish **không** hơn việc dùng cùng CPU để chạy thêm thế hệ: C102-25 hai cách ngang nhau (+0.074 so với +0.053, p = 0.432), R201-50 chạy thêm thế hệ tốt hơn rõ (+0.149 so với +0.045, p = 0.002). Ở ngân sách đã hội tụ thì ngược lại, polish tốt hơn: C102-25 +0.052 so với +0.0007 (p = 0.002), R201-50 +0.018 so với +0.007 (p = 0.049, và ước lượng này vốn có lợi cho thế hệ).
+- **So với `dp` chấm mọi cá thể** (cùng reference set, 200 thế hệ): `baseline_polish` đạt HV 0.921 so với 0.936 của `dp` ở C102-25 (khoảng 83% mức tăng của `dp` so với baseline) và 0.748 so với 0.728 ở R201-50 (cao hơn `dp`), với một phần mười chi phí CPU của `dp` (xem bảng tuning). Chưa kiểm định thống kê cặp này.
+- **Giới hạn.** 10 seed, hai instance, và n_gen = 1400/3500 do tôi chọn để xấp xỉ chi phí của `dp`, không phải ngân sách cuối của nhóm; kết luận cần xác nhận lại khi nhóm chốt ngân sách.
+
+## Recommendations
+
+| Cờ | Đề xuất (chưa áp dụng vào `config.yaml`) | Lý do |
 |---|---|---|
-| `dp_split` | `mode: polish`, `polish_k: 10` | giữ 50–63% mức tăng HV của `every_eval` với 1.3–1.8 lần thay vì 9–20 lần chi phí CPU, front dày hơn; K = 30 không đáng thêm; lưu ý ở R201-50 chạy baseline thêm thế hệ còn tốt hơn |
-| `adaptive_rates` | giữ **tắt**; nếu phải bật thì `v1` (pc 0.7–0.9, pm 0.1–0.3, `stagnation_gens: 0`) | `v1` bỏ được suy giảm của bản mặc định nhưng chưa có bằng chứng cải thiện; phần trì trệ vô hiệu nên không đáng bật |
+| `dp_split` | `mode: polish`, `polish_k: 10` | lợi ích còn nguyên ở ngân sách đã hội tụ (10/10 seed, p = 0.002, chỉ tốn khoảng 6% CPU của run dài) và ở đó tốt hơn việc dùng cùng CPU cho thêm thế hệ; K = 30 không đáng thêm; lưu ý đây là bước hoàn thiện cuối chứ không thay cho ngân sách, vì ở 200 thế hệ chạy thêm thế hệ ngang hoặc tốt hơn |
+| `adaptive_rates` | giữ **tắt** | cơ chế tăng pm khi trì trệ gần như không bao giờ kích hoạt (0–15 trên 200 thế hệ ở C102-25, 0 ở R201-50, vì front 1 đổi gần như mỗi thế hệ), nên `v3` thực chất bằng `v1` và `v2` bằng baseline; `v1` chỉ bỏ được suy giảm của bản mặc định, chưa có cải thiện; muốn dùng cần đổi tiêu chí trì trệ trước |
+| `dp_split` kiểu `every_eval` | không dùng làm mặc định | tốn 9–20 lần CPU của baseline, và `baseline_polish` đạt HV ngang hoặc cao hơn ở 200 thế hệ với một phần mười chi phí |
 
 ## Ghi chú
 

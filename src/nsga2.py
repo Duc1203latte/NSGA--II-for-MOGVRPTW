@@ -188,6 +188,28 @@ def make_offspring(pop: list[np.ndarray], rank: np.ndarray, crowd: np.ndarray,
         del child_W_out[len(pop):]
     return children[: len(pop)]
 
+def polish_front(pop: list[np.ndarray], F: np.ndarray, CV: np.ndarray, inst: Instance,
+                 dp_params: dict) -> dict:
+    """--- TV4 dp_split polish. Chấm lại từng hoán vị của quần thể cuối bằng evaluate_dp với K vector
+    trọng số cố định (lưới simplex tất định, không RNG), gộp với quần thể cuối (hàng baseline đứng trước),
+    bỏ hàng trùng vector mục tiêu và CV, rồi lấy tập không trội. Dùng chung cho lúc chạy (mode=polish) và
+    cho polish ngoại tuyến trên kết quả đã lưu (scripts/tv4_polish_offline.py).
+    Trả về pop, F, CV, W (NaN = chấm bằng split baseline), front, n_calls (số lời gọi evaluate_dp thêm)."""
+    from src.improvements.dp_split import objective_scales, simplex_lattice
+    scales = objective_scales(inst, dp_params["g3_scale"])
+    lattice = simplex_lattice(dp_params["polish_k"])
+    cand = [x for x in pop for _ in lattice]
+    W_cand = np.tile(lattice, (len(pop), 1))
+    F_c, CV_c = evaluate_population(cand, inst, W_cand, scales)
+    pool_pop, pool_F, pool_CV = list(pop) + cand, np.vstack([F, F_c]), np.concatenate([CV, CV_c])
+    pool_W = np.vstack([np.full((len(pop), 3), np.nan), W_cand])
+    _, uniq = np.unique(np.column_stack([pool_F, pool_CV]), axis=0, return_index=True)
+    uniq.sort()
+    new_pop, new_F, new_CV, new_W = [pool_pop[i] for i in uniq], pool_F[uniq], pool_CV[uniq], pool_W[uniq]
+    rank, _ = rank_and_crowding(new_F, new_CV)
+    return {"pop": new_pop, "F": new_F, "CV": new_CV, "W": new_W,
+            "front": np.flatnonzero(rank == 0), "n_calls": len(cand)}
+
 def check_config(cfg: dict) -> None:
     p = cfg["nsga2"]
     if p["crossover"] not in CROSSOVERS:
@@ -275,24 +297,11 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
     front = np.flatnonzero(rank == 0)
     pre_polish = None
     if use_polish:  # --- TV4 dp_split polish: DP với K trọng số cố định cho từng hoán vị cuối, không RNG
-        from src.improvements.dp_split import objective_scales, simplex_lattice
-        dp_params = imp["dp_split_params"]
         pre_polish = {"pop": [x.tolist() for x in pop], "F": F.copy(), "CV": CV.copy(), "front": front.copy()}
-        scales = objective_scales(inst, dp_params["g3_scale"])
-        lattice = simplex_lattice(dp_params["polish_k"])
-        cand = [x for x in pop for _ in lattice]
-        W_cand = np.tile(lattice, (len(pop), 1))
-        F_c, CV_c = evaluate_population(cand, inst, W_cand, scales)
-        n_evals += len(cand)
-        n_dp_calls += len(cand)
-        # gộp với quần thể cuối (hàng baseline đứng trước), bỏ hàng có cùng vector mục tiêu và CV
-        pool_pop, pool_F, pool_CV = pop + cand, np.vstack([F, F_c]), np.concatenate([CV, CV_c])
-        pool_W = np.vstack([np.full((len(pop), 3), np.nan), W_cand])     # NaN = chấm bằng split baseline
-        _, uniq = np.unique(np.column_stack([pool_F, pool_CV]), axis=0, return_index=True)
-        uniq.sort()
-        pop, F, CV, W = [pool_pop[i] for i in uniq], pool_F[uniq], pool_CV[uniq], pool_W[uniq]
-        rank, _ = rank_and_crowding(F, CV)
-        front = np.flatnonzero(rank == 0)
+        pol = polish_front(pop, F, CV, inst, imp["dp_split_params"])
+        pop, F, CV, W, front = pol["pop"], pol["F"], pol["CV"], pol["W"], pol["front"]
+        n_evals += pol["n_calls"]
+        n_dp_calls += pol["n_calls"]
     return {
         "pop": [x.tolist() for x in pop],
         "F": F,                     # cực tiểu: (f1, f2, 1 - f3)

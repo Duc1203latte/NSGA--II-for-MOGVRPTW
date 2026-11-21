@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from scipy.stats import ranksums
+from scipy.stats import ranksums, wilcoxon
 
 from src.decoder import evaluate_detail
 from src.improvements.dp_split import evaluate_dp, objective_scales
@@ -117,6 +117,50 @@ def eq_budget_table(exp: str, inst_name: str, dp_cost_ratio: dict[str, float]) -
     return "\n".join(lines)
 
 
+def polish_vs_generations(exp: str, inst_name: str, tune_exp: str = "tv4_tune") -> str:
+    """Bước polish đổi lấy bao nhiêu HV so với việc dùng cùng chi phí CPU cho thêm thế hệ baseline?
+    Chi phí một thế hệ baseline = cpu_s(baseline, 200 thế hệ) / 200 từ cpu_cost.csv của tv4_tune (đo tuần
+    tự); g_eq = CPU của bước polish / chi phí một thế hệ. Do history[g] của run baseline_eqtime chính là run
+    baseline n_gen = g cùng seed, ta tính HV(baseline ở B + g_eq thế hệ). Ở ngân sách dài nhất không có thế hệ
+    sau B nên dùng HV(B) - HV(B - g_eq) làm giá trị biên của g_eq thế hệ cuối (ước lượng thiên về có lợi cho
+    việc chạy thêm thế hệ, vì lợi ích mỗi thế hệ giảm dần)."""
+    cfg0 = load_config()
+    root = results_root(cfg0)
+    exp_dir = root / exp / inst_name
+    ref_point = cfg0["metrics"]["hv_ref_point"]
+    per_run, ref, bounds = analyze_all(exp_dir, ref_point, with_ref=True)
+    cpu = pd.read_csv(root / tune_exp / "cpu_cost.csv")
+    base_cpu = float(cpu[(cpu.instance == inst_name) & (cpu.config == "baseline")].cpu_s.iloc[0])
+    per_gen = base_cpu / cfg0["nsga2"]["n_gen"]
+    eq = sorted(load_seed_files(exp_dir, "baseline_eqtime"), key=lambda r: r["seed"])
+    n_eq = len(eq[0]["history"]) - 1
+
+    def hv_at(g):
+        return np.array([evaluate_front(r["history"][g], ref, bounds, ref_point)["HV"] for r in eq])
+
+    def hv_cfg(name):
+        return per_run[per_run.config == name].sort_values("seed").HV.to_numpy()
+
+    lines = ["| Instance | Ngân sách B (thế hệ) | CPU polish (s) | = thế hệ baseline | HV polish − HV chưa polish | "
+             "HV thêm nếu dùng cùng CPU cho thế hệ | p (HV), signed-rank, polish so với thế hệ thêm |",
+             "|---|---|---|---|---|---|---|"]
+    for src, out, B in (("baseline", "baseline_polish", cfg0["nsga2"]["n_gen"]),
+                        ("baseline_eqtime", "baseline_eqtime_polish", n_eq)):
+        runs = load_seed_files(exp_dir, out)
+        pol_cpu = float(np.mean([r["polish_cpu_s"] for r in runs]))
+        g_eq = int(round(pol_cpu / per_gen))
+        gain_pol = hv_cfg(out) - hv_cfg(src)
+        if B + g_eq <= n_eq:
+            gain_gen, how = hv_at(B + g_eq) - hv_at(B), f"HV({B + g_eq}) − HV({B})"
+        else:
+            gain_gen, how = hv_at(B) - hv_at(B - g_eq), f"HV({B}) − HV({B - g_eq}) (ước lượng)"
+        d = gain_pol - gain_gen
+        pv = wilcoxon(gain_pol, gain_gen).pvalue if np.any(d != 0) else 1.0
+        lines.append(f"| {inst_name} | {B} | {pol_cpu:.1f} | {g_eq} | {fmt(gain_pol.mean(), gain_pol.std(ddof=1))} | "
+                     f"{fmt(gain_gen.mean(), gain_gen.std(ddof=1))} ({how}) | {pstr(pv)} |")
+    return "\n".join(lines)
+
+
 def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
                   order: list[str] | None = None) -> list[dict]:
     base_cfg = load_config()
@@ -150,6 +194,9 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
             "front_size": f"{pr.n_points.mean():.1f}",
             "n_dp_calls": f"{np.mean([r.get('n_dp_calls', 0) for r in runs]):.0f}",
             "cpu_rel": "—",
+            "polish_cpu": (f"{np.mean([r['polish_cpu_s'] for r in runs]):.1f}"
+                           if all(r.get("polish_cpu_s") is not None for r in runs) else "—"),
+            "pair_dHV": "—", "pair_p_HV": "—", "pair_dIGD": "—", "pair_p_IGD": "—",
             "dHV": "—", "p_HV": "—", "p_IGD": "—", "p_HV_eq": "—", "p_IGD_eq": "—",
         }
         if cpu is not None:
@@ -164,6 +211,21 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
             row["p_HV_eq"] = pstr(ranksums(pr.HV, eq.HV).pvalue)
             row["p_IGD_eq"] = pstr(ranksums(pr.IGD, eq.IGD).pvalue)
         rows.append(row)
+    # kiểm định cặp theo seed (Wilcoxon signed-rank): cấu hình đã polish so với bản chưa polish cùng seed
+    partner = {"baseline_polish": "baseline", "baseline_eqtime_polish": "baseline_eqtime"}
+    by_cfg = {r["config"]: r for r in rows}
+    for r in rows:
+        q = partner.get(r["config"])
+        if q not in by_cfg:
+            continue
+        a = per_run[per_run.config == r["config"]].sort_values("seed")
+        b = per_run[per_run.config == q].sort_values("seed")
+        assert a.seed.tolist() == b.seed.tolist()
+        for m in ("HV", "IGD"):
+            d = a[m].to_numpy() - b[m].to_numpy()
+            pv = wilcoxon(a[m].to_numpy(), b[m].to_numpy()).pvalue if np.any(d != 0) else 1.0
+            r[f"pair_d{m}"] = f"{d.mean():+.4f} ± {d.std(ddof=1):.4f}"
+            r[f"pair_p_{m}"] = pstr(pv)
     return rows
 
 
@@ -181,6 +243,13 @@ TUNE_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("HV", "HV"), 
              ("feas_front", "Khả thi (front)"), ("front_size", "Số điểm front")]
 
 
+POLISH_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("n_gen", "n_gen"), ("HV", "HV"),
+               ("pair_dHV", "ΔHV so với bản chưa polish (cặp)"), ("pair_p_HV", "p (HV), signed-rank"),
+               ("IGD", "IGD"), ("pair_dIGD", "ΔIGD so với bản chưa polish (cặp)"),
+               ("pair_p_IGD", "p (IGD), signed-rank"), ("front_size", "Số điểm front"),
+               ("polish_cpu", "CPU của bước polish (s/run)"), ("feas_front", "Khả thi (front)")]
+
+
 def to_markdown(rows: list[dict], cols=None) -> str:
     cols = cols or COLS
     head = "| " + " | ".join(h for _, h in cols) + " |"
@@ -196,12 +265,13 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     ap.add_argument("--exclude", nargs="*", default=[], help="bỏ cấu hình khỏi reference set (kiểm lại bảng cũ)")
     ap.add_argument("--order", nargs="*", default=None, help="thứ tự cấu hình trong bảng")
-    ap.add_argument("--cols", choices=["full", "tune"], default="full")
+    ap.add_argument("--cols", choices=["full", "tune", "polish"], default="full")
     args = ap.parse_args()
     rows = [r for inst in args.instances
             for r in instance_rows(args.exp, inst, tuple(args.exclude), args.order)]
     n_runs = sorted({r["n_runs"] for r in rows})
-    text = (to_markdown(rows, TUNE_COLS if args.cols == "tune" else None) + "\n\n"
+    cols = {"tune": TUNE_COLS, "polish": POLISH_COLS}.get(args.cols)
+    text = (to_markdown(rows, cols) + "\n\n"
             f"Mỗi ô: trung bình ± độ lệch chuẩn qua {n_runs} run (cùng bộ seed cho mọi cấu hình). "
             "p-value: Wilcoxon rank-sum hai phía so với baseline cùng instance; chưa hiệu chỉnh đa so sánh.\n\n"
             f"- {NOTE_RUNTIME}\n- {NOTE_REF}\n")
@@ -212,6 +282,10 @@ def main() -> None:
             + "\n\n".join(eq_budget_table(args.exp, i, DP_COST_RATIO) for i in args.instances)
             + "\n\nChi phí CPU: hệ số một thế hệ dp / một thế hệ baseline đo cùng lúc, cùng máy "
             + f"({ratios}); 1.00 = bằng chi phí dp." + "\n")
+    if args.cols == "polish":
+        text += ("\n### Polish so với dùng cùng chi phí CPU cho thêm thế hệ\n\n"
+                 + "\n\n".join(polish_vs_generations(args.exp, i) for i in args.instances)
+                 + "\n\nChi phí một thế hệ baseline lấy từ `tv4_tune/cpu_cost.csv` (baseline, 200 thế hệ, CPU tuần tự).\n")
     print(text)
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
