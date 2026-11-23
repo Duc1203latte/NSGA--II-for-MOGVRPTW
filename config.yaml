@@ -104,6 +104,13 @@ improvements:
   local_search: false         # 2-opt và Or-opt sau đột biến
   diversity: false            # SDE / kNN density và external archive
   dp_split: false             # split tối ưu bằng quy hoạch động, Pc/Pm thích nghi
+  # Tham số TV3 (chỉ đọc khi diversity bật). Chưa tuning, TV4 chỉnh ở giai đoạn 3.
+  diversity_params:
+    density: sde              # sde : shift-based density (phạt cá thể chỉ giỏi một mục tiêu)
+                              # knn : khoảng cách tới láng giềng gần thứ k
+    k: 1                      # láng giềng thứ k; hoà thì xét tiếp k+1, k+2... như SPEA2
+    archive: true             # true: giữ external archive, kết quả cuối là archive
+    archive_size: 80          # = n_pop, để số điểm trả về ngang baseline (HV không thiên vị)
 
 # ---------------------------------------------------------------------------
 # Chỉ số đánh giá

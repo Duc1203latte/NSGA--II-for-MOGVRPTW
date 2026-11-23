@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 from src.decoder import evaluate_detail
 from src.instance import Instance
+from src.improvements import diversity
 
 CROSSOVERS = ("ox", "obx")
 MUTATIONS = ("standard", "always")
@@ -53,12 +54,15 @@ def crowding_distance(F: np.ndarray) -> np.ndarray:
             dist[order[1:-1]] += (F[order[2:], j] - F[order[:-2], j]) / (hi - lo)
     return dist
 
-def rank_and_crowding(F: np.ndarray, CV: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def rank_and_crowding(F: np.ndarray, CV: np.ndarray,
+                      div: dict | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """div = improvements.diversity_params khi bật diversity: thay crowding bằng điểm thưa SDE/kNN"""
     rank = non_dominated_sort(F, CV)
     crowd = np.zeros(len(F))
     for r in np.unique(rank):
         idx = np.flatnonzero(rank == r)
-        crowd[idx] = crowding_distance(F[idx])
+        crowd[idx] = (crowding_distance(F[idx]) if div is None
+                      else diversity.density_score(F[idx], div["density"], div["k"]))
     return rank, crowd
 
 def split_duplicates(pop: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
@@ -73,17 +77,29 @@ def split_duplicates(pop: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
 
 
 def select_survivors(pop: list[np.ndarray], F: np.ndarray, CV: np.ndarray,
-                     n_keep: int, eliminate_duplicates: bool) -> np.ndarray:
+                     n_keep: int, eliminate_duplicates: bool, div: dict | None = None) -> np.ndarray:
     """Chọn n_keep cá thể sống sót. Nếu loại trùng: chỉ chọn trong các hoán vị khác nhau,
     bản sao chỉ dùng để lấp chỗ khi không đủ hoán vị khác nhau"""
     if not eliminate_duplicates:
-        return environmental_selection(F, CV, n_keep)
+        return environmental_selection(F, CV, n_keep, div)
     first, dup = split_duplicates(pop)
     if len(first) >= n_keep:
-        return first[environmental_selection(F[first], CV[first], n_keep)]
+        return first[environmental_selection(F[first], CV[first], n_keep, div)]
     return np.concatenate([first, dup[: n_keep - len(first)]])
 
-def environmental_selection(F: np.ndarray, CV: np.ndarray, n_keep: int) -> np.ndarray:
+def environmental_selection(F: np.ndarray, CV: np.ndarray, n_keep: int,
+                            div: dict | None = None) -> np.ndarray:
+    if div is not None:   # TV3: cắt front cuối bằng cách bỏ dần cá thể đông nhất
+        rank = non_dominated_sort(F, CV)
+        chosen = np.empty(0, dtype=int)
+        for r in np.unique(rank):
+            idx = np.flatnonzero(rank == r)
+            if len(chosen) + len(idx) > n_keep:
+                idx = idx[diversity.truncate(F[idx], n_keep - len(chosen), div["density"], div["k"])]
+            chosen = np.concatenate([chosen, idx])
+            if len(chosen) == n_keep:
+                break
+        return chosen
     rank, crowd = rank_and_crowding(F, CV)
     chosen: list[int] = []
     for r in np.unique(rank):
@@ -180,30 +196,46 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
     n_pop, n_gen = p["n_pop"], p["n_gen"]
     pm = mutation_rate(inst, cfg)
     rng = np.random.default_rng(seed)
+    imp = cfg.get("improvements", {})
+    div = imp["diversity_params"] if imp.get("diversity") else None
+    use_archive = div is not None and div["archive"]
+    if div is not None:
+        diversity.check_params(div)
 
     pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
     F, CV = evaluate_population(pop, inst)
     n_evals = n_pop
     history = []
+    if use_archive:
+        arc = diversity.update_archive([], np.empty((0, 3)), np.empty(0), pop, F, CV,
+                                       div["archive_size"], div["density"], div["k"])
 
     for _ in range(n_gen):
-        rank, crowd = rank_and_crowding(F, CV)
-        history.append(F[rank == 0].copy())
+        rank, crowd = rank_and_crowding(F, CV, div)
+        history.append(arc[1].copy() if use_archive else F[rank == 0].copy())
 
         children = make_offspring(pop, rank, crowd, cfg, pm, rng)
         F_child, CV_child = evaluate_population(children, inst)
         n_evals += len(children)
+        if use_archive:
+            arc = diversity.update_archive(*arc, children, F_child, CV_child,
+                                           div["archive_size"], div["density"], div["k"])
 
         merged = pop + children
         F_all = np.vstack([F, F_child])
         CV_all = np.concatenate([CV, CV_child])
-        keep = select_survivors(merged, F_all, CV_all, n_pop, p["eliminate_duplicates"])
+        keep = select_survivors(merged, F_all, CV_all, n_pop, p["eliminate_duplicates"], div)
         pop = [merged[i] for i in keep]
         F, CV = F_all[keep], CV_all[keep]
 
-    rank, _ = rank_and_crowding(F, CV)
-    history.append(F[rank == 0].copy())
-    front = np.flatnonzero(rank == 0)
+    rank, _ = rank_and_crowding(F, CV, div)
+    if use_archive:   # TV3: kết quả cuối là archive, không phải front của quần thể cuối
+        pop, F, CV = arc
+        front = np.arange(len(pop))
+        history.append(F.copy())
+    else:
+        history.append(F[rank == 0].copy())
+        front = np.flatnonzero(rank == 0)
     return {
         "pop": [x.tolist() for x in pop],
         "F": F,                     # cực tiểu: (f1, f2, 1 - f3)
