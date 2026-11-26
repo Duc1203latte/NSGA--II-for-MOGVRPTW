@@ -162,11 +162,16 @@ def analyze(exp: str, instance_name: str, cfg: dict) -> dict[str, pd.DataFrame]:
         })
     pairwise = pd.DataFrame(pair_rows)
 
-    # Đường hội tụ: HV trung bình qua các thế hệ
-    convergence = pd.DataFrame({
-        config_name: np.mean([hv_history(r["history"], bounds, ref_point) for r in rs], axis=0)
-        for config_name, rs in runs.items()
-    })
+    # Đường hội tụ: HV trung bình qua các thế hệ. Các cấu hình có thể khác n_gen nên ghép theo
+    # số thứ tự thế hệ; cấu hình ngắn hơn để trống (NaN) ở các thế hệ sau.
+    curves = {}
+    for config_name, rs in runs.items():
+        hs = [hv_history(r["history"], bounds, ref_point) for r in rs]
+        if len({len(h) for h in hs}) > 1:
+            raise ValueError(f"cấu hình {config_name!r} có các seed chạy số thế hệ khác nhau: "
+                             f"chạy lại cấu hình đó với --overwrite")
+        curves[config_name] = pd.Series(np.mean(hs, axis=0))
+    convergence = pd.concat(curves, axis=1)
     convergence.index.name = "generation"
 
     out = {"per_run": per_run, "summary": summary, "pairwise": pairwise, "convergence": convergence}
