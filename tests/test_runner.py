@@ -87,3 +87,20 @@ def test_analyze_allows_different_split_rules(tmp_path):
     run_config("cat", "a", "C102", 25, tiny_config(tmp_path), [0])
     run_config("cat", "b", "C102", 25, tiny_config(tmp_path, "split_rule=capacity"), [0])
     assert len(analyze("cat", "C102-25", tiny_config(tmp_path))["pairwise"]) == 1
+
+
+def test_analyze_handles_configs_with_different_n_gen(tmp_path):
+    # tiny_config có n_gen = 3; cấu hình "dai" chạy 5 thế hệ
+    run_config("ngen", "ngan", "C102", 25, tiny_config(tmp_path), [0, 1])
+    run_config("ngen", "dai", "C102", 25, tiny_config(tmp_path, "nsga2.n_gen=5"), [0, 1])
+    conv = analyze("ngen", "C102-25", tiny_config(tmp_path))["convergence"]
+    assert len(conv) == 5 + 1
+    assert conv["dai"].notna().all()
+    assert conv["ngan"].notna().sum() == 3 + 1           # các thế hệ sau 3 để trống
+
+
+def test_analyze_rejects_mixed_n_gen_inside_one_config(tmp_path):
+    run_config("tron_ngen", "a", "C102", 25, tiny_config(tmp_path), [0])
+    run_config("tron_ngen", "a", "C102", 25, tiny_config(tmp_path, "nsga2.n_gen=5"), [1])
+    with pytest.raises(ValueError, match="số thế hệ khác nhau"):
+        analyze("tron_ngen", "C102-25", tiny_config(tmp_path))
