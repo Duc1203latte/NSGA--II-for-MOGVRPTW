@@ -41,7 +41,7 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 | 1 | 5/11 – 11/11 | Test decoder, NSGA-II baseline, bộ đo | 1 | xong (13/11) |
 | 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | 3 | xong, merge vào `main` 26–27/11 |
 | 3 | 19/11 – 25/11 | Merge, ablation, tuning | 3 | xong (27/11), xem mục "Kết quả giai đoạn 3" |
-| 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | 4 | |
+| 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | 4 | thí nghiệm và hình xong (27/11), xem mục "Kết quả giai đoạn 4"; báo cáo, slide đang làm |
 
 ## Phân công
 
@@ -815,6 +815,50 @@ hình cuối bằng ghi đè, ví dụ:
     --set improvements.diversity=true --set improvements.diversity_params.archive=false `
     --set improvements.dp_split=true --set improvements.dp_split_params.mode=polish
   ```
+
+  Bản đầy đủ cho cả 10 instance là `scripts/final_runs.py` (mục dưới).
+
+## Kết quả giai đoạn 4: chạy đầy đủ và so với bài báo (27/11)
+
+Số liệu đầy đủ ở **`docs/final_results.md`** (bản PDF: `docs/final_results.pdf`), hình ở
+`docs/figures/final/` kèm chú thích trong `captions.md`. Mục này chỉ ghi cách làm và kết luận chính.
+
+### Cách làm
+
+| Mục | Giá trị |
+|---|---|
+| Instance | đủ 9 instance Solomon bài báo dùng (C102, R201, RC202 ở 25 và 50 khách; C102, R201, RC201 ở 100 khách) và case29 |
+| Cấu hình | baseline (NSGA-II gốc), **I+D+P** (cấu hình cuối), I+L+D+P (chỉ để tham khảo, chỉ chạy 200 thế hệ) |
+| Ngân sách | `final_g200`: 200 thế hệ, seed 0–19 (bằng ngân sách bài báo); `final_g1000`: 1000 thế hệ, seed 0–9 |
+| Chạy | `scripts/final_runs.py`: `run` chạy, `summarize` xuất `results/final_summary.csv` |
+| Hình | `scripts/plot_final.py`, 11 hình: 5 hình trực quan bài toán (bản đồ, hàm hài lòng, sơ đồ thuật toán, bộ tuyến, lịch giao) và 6 hình kết quả |
+
+```powershell
+python -m scripts.final_runs run --exp final_g200 --seeds 0-19 --configs baseline,IDP,ILDP
+python -m scripts.final_runs run --exp final_g1000 --seeds 0-9 --configs baseline,IDP --set nsga2.n_gen=1000
+python -m scripts.final_runs summarize final_g200 final_g1000
+python -m scripts.plot_final
+```
+
+800 run trên 16 tiến trình mất khoảng 1 giờ. Mọi lời giải trên front của mọi run đều không vượt đội xe.
+
+### Kết luận chính
+
+- **I+D+P tốt hơn NSGA-II gốc có ý nghĩa thống kê trên 10/10 instance ở 200 thế hệ** (p < 0.001 cả HV và
+  IGD) **và 7/10 ở 1000 thế hệ**. Ba instance còn lại (R201-25, RC202-25, case29) là nơi baseline chạy lâu
+  cũng gần hội tụ; I+D+P vẫn có HV cao hơn ở cả ba.
+- **Càng nhiều khách, cải tiến càng rõ:** ở 200 thế hệ HV tăng 8–37% với 25 khách, 42–100% với 50 khách,
+  115–300% với 100 khách. Để đạt HV của baseline chạy 1000 thế hệ, I+D+P chỉ cần 15 thế hệ (C102-100) đến
+  493 thế hệ (case29).
+- **Chi phí thêm nhỏ:** 5% số lần đánh giá, 1.1–2.3 lần thời gian ở 200 thế hệ (phần polish).
+- **So với bài báo, chỉ đặt cạnh, không kết luận "tốt hơn bài báo":**
+  - Mức tăng HV của nhóm so với NSGA-II của chính mình cùng chiều với mức INSGA-III tăng so với NSGA-II
+    trong bài báo, và lớn hơn trên 7/10 instance. Hai bên chuẩn hoá HV khác nhau nên không so số HV trực tiếp.
+  - f1 của nhóm thấp hơn bài báo 2–30 lần trên Solomon. Nguyên nhân chính là mô hình khác: cách cắt tuyến
+    `capacity_time` mở thêm xe để tránh đến muộn, nên tiền phạt F4 nhỏ hơn nhiều.
+  - case29 so được sát nhất: f1 nhỏ nhất của nhóm (2224) ngang INSGA-III (2262). f2 nhỏ nhất của nhóm (197)
+    cao hơn 140.65 của bài báo, đúng chỗ bài báo tự mâu thuẫn về hệ số phát thải. f3 lớn nhất của nhóm 0.931
+    so với 1.000, do nhóm tính hài lòng tại giờ xe đến nên đến sớm cũng bị trừ điểm.
 
 ## Bốn cải tiến
 
