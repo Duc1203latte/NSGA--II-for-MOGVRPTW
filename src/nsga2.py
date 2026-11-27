@@ -22,10 +22,33 @@ def evaluate_population(pop: list[np.ndarray], inst: Instance, W: np.ndarray | N
         else:  # --- TV4 dp_split
             from src.improvements.dp_split import evaluate_dp
             d = evaluate_dp(perm.tolist(), inst, W[i], scales)
-        F[i] = (d["f1"], d["f2"], 1.0 - d["f3"])
-        if inst.fleet_size is not None:
-            CV[i] = max(0, d["n_vehicles"] - inst.fleet_size)
+        F[i], CV[i] = objective_row(d, inst)
     return F, CV
+
+def objective_row(d: dict, inst: Instance) -> tuple[tuple[float, float, float], float]:
+    '''(f1, f2, 1 - f3) và số xe vượt giới hạn của một kết quả decoder.'''
+    cv = max(0, d["n_vehicles"] - inst.fleet_size) if inst.fleet_size is not None else 0.0
+    return (d["f1"], d["f2"], 1.0 - d["f3"]), cv
+
+def local_search_children(children: list[np.ndarray], ls, rng: np.random.Generator, inst: Instance,
+                          W: np.ndarray | None, scales: np.ndarray | None
+                          ) -> tuple[np.ndarray, np.ndarray, int]:
+    '''--- TV2 local_search. Sửa children tại chỗ. Con đã qua LS dùng lại kết quả chấm chính xác
+    LS trả về (cùng evaluator, cùng trọng số DP); con còn lại chấm như baseline.
+    Trả F, CV và số lần gọi evaluator, tính cả các lần gọi bên trong LS.'''
+    real0 = ls.counters.n_real_model_evals
+    F, CV, todo = np.empty((len(children), 3)), np.zeros(len(children)), []
+    for k, c in enumerate(children):
+        perm, d = ls(c.tolist(), rng, None if W is None else {"dp_weights": W[k]})
+        children[k] = np.array(perm, dtype=c.dtype)
+        if d is None:
+            todo.append(k)
+        else:
+            F[k], CV[k] = objective_row(d, inst)
+    if todo:
+        F[todo], CV[todo] = evaluate_population([children[k] for k in todo], inst,
+                                                None if W is None else W[todo], scales)
+    return F, CV, len(todo) + ls.counters.n_real_model_evals - real0
 
 #Sắp xếp không trội
 def domination_matrix(F: np.ndarray, CV: np.ndarray) -> np.ndarray:
@@ -255,7 +278,15 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
             raise ValueError(f"dp_split_params.mode = {dp_mode!r}, chỉ nhận every_eval | polish")
         use_polish, use_dp = dp_mode == "polish", dp_mode == "every_eval"   # polish: tiến hoá như baseline
 
-    pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
+    init_sources = None
+    if imp.get("init_smart", False):  # --- TV2 init_smart: nhóm random dùng đúng dòng sinh của baseline
+        from src.improvements.tv2_hooks import smart_initial_population
+        ids = np.arange(1, inst.n + 1)
+        perms, init_sources = smart_initial_population(imp, inst, n_pop, rng,
+                                                       lambda r: r.permutation(ids).tolist())
+        pop = [np.array(x, dtype=ids.dtype) for x in perms]
+    else:
+        pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
     # --- TV4 dp_split: trọng số khởi tạo, bốc SAU các hoán vị để dãy hoán vị giống baseline.
     # W song song với pop (N x 3): đi theo pop qua khởi tạo, con cái, merged và chỉ số keep.
     W = scales = None
@@ -272,6 +303,18 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         from src.improvements.adaptive import StagnationTracker, adaptive_rates, resolve_params
         ad_params = resolve_params(imp["adaptive_params"], p, case29=inst.name.startswith("case29"))
         tracker = StagnationTracker(ad_params["stagnation_gens"], ad_params["boost"])
+    ls = None
+    if imp.get("local_search", False):  # --- TV2 local_search: evaluator của LS = evaluator chấm con
+        from src.improvements.tv2_hooks import LocalSearchHook
+
+        def ls_eval(perm, meta):
+            if use_dp:
+                from src.improvements.dp_split import evaluate_dp
+                return evaluate_dp(perm, inst, meta["dp_weights"], scales)
+            return evaluate_detail(perm, inst)
+        # DP (every_eval) được phép cắt lại tuyến; polish tiến hoá bằng split baseline nên vẫn kiểm drift
+        ls = LocalSearchHook.from_config({**imp, "dp_split": use_dp}, inst, ls_eval,
+                                         baseline_detail_fn=lambda q: evaluate_detail(q, inst))
     F, CV = evaluate_population(pop, inst, W, scales)
     n_evals = n_pop
     history = []
@@ -298,8 +341,13 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         child_W = [] if use_dp else None
         children = make_offspring(pop, rank, crowd, cfg, pm, rng, W, rate_fn, child_W)
         W_child = np.array(child_W) if use_dp else None
-        F_child, CV_child = evaluate_population(children, inst, W_child, scales)
-        n_evals += len(children)
+        if ls is None:
+            F_child, CV_child = evaluate_population(children, inst, W_child, scales)
+            n_evals += len(children)
+        else:  # --- TV2 local_search: sau đột biến và trọng số DP, trước khi chấm
+            F_child, CV_child, n_child_evals = local_search_children(children, ls, rng, inst,
+                                                                     W_child, scales)
+            n_evals += n_child_evals
         if use_archive:
             arc = diversity.update_archive(*arc, children, F_child, CV_child,
                                            div["archive_size"], div["density"], div["k"])
@@ -353,4 +401,7 @@ def run(inst: Instance, cfg: dict, seed: int) -> dict:
         "wall_time_s": time.perf_counter() - t_start,
         "dp_mode": "polish" if use_polish else ("every_eval" if use_dp else None),
         "pre_polish": pre_polish,   # polish: quần thể/F/CV/front trước khi polish (bằng baseline cùng seed)
+        # --- TV2: thông tin thêm, không ảnh hưởng thuật toán
+        "init_sources": init_sources,                       # nhãn nguồn quần thể đầu; None khi tắt
+        "ls_counters": None if ls is None else {**ls.counters.as_dict(), "n_evals_total": n_evals},
     }
