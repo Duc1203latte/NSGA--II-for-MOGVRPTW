@@ -39,8 +39,8 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 |---|---|---|---|---|
 | 0 | 3/11 – 4/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | 1 | xong |
 | 1 | 5/11 – 11/11 | Test decoder, NSGA-II baseline, bộ đo | 1 | xong (13/11) |
-| 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | 3 | |
-| 3 | 19/11 – 25/11 | Merge, ablation, tuning | 3 | |
+| 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | 3 | xong, merge vào `main` 26–27/11 |
+| 3 | 19/11 – 25/11 | Merge, ablation, tuning | 3 | xong (27/11), xem mục "Kết quả giai đoạn 3" |
 | 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | 4 | |
 
 ## Phân công
@@ -436,6 +436,12 @@ thì W = 100. Trên ba lời giải mẫu của bài báo:
 Giai đoạn 1 chạy NSGA-II baseline với cả hai giá trị, so front Pareto và hệ số tương quan giữa ba mục
 tiêu, rồi đưa kết quả vào báo cáo. **Kết quả hai cách phải lưu ở hai thư mục riêng**, không trộn.
 
+**Chốt (27/11): dùng `arrival` cho mọi thí nghiệm chính** (tuning, ablation, giai đoạn 4). Lý do: kết quả
+baseline giai đoạn 1 cho thấy với `service_start` ngay cả hoán vị ngẫu nhiên cũng đạt f3 = 1.000 trên 7/10
+instance, tức mục tiêu thứ ba gần như mất tác dụng (xem "Những điều rút ra" ở mục kết quả baseline).
+`service_start` chỉ còn xuất hiện trong báo cáo như một phân tích độ nhạy, dùng kết quả đã có ở
+`results/baseline_service_start/`.
+
 ### Những điểm mô hình chưa xử lý
 
 - **Số xe tối đa** (`fleet_size`): decoder chỉ báo ra qua `fleet_ok`. NSGA-II xử lý bằng constrained
@@ -716,7 +722,7 @@ Không run nào vượt số xe tối đa.
 1. **`service_start` làm f3 gần như vô nghĩa.** Với cách cắt tuyến `capacity_time`, ngay cả hoán vị ngẫu
    nhiên cũng đạt f3 = 1.000 trên 7/10 instance. Front chỉ còn 4–15 điểm và HV dao động rất mạnh. Đề
    xuất: **dùng `arrival` cho mọi thí nghiệm chính**, còn `service_start` chỉ đưa vào báo cáo như một
-   phân tích độ nhạy. Cần cả nhóm chốt.
+   phân tích độ nhạy. Đã chốt ngày 27/11.
 2. **Tương quan f1–f2 phụ thuộc vào phần phạt đến muộn.** Trên 25 và 50 khách, f1 và f2 tương quan rất
    mạnh (0.60–0.98), đúng như lỗi số 2 của bài báo (f2 tỉ lệ với quãng đường). Trên 100 khách, tương quan
    gần 0 hoặc âm (C102-100: 0.10, R201-100: −0.17), vì ở đó f1 bị phần phạt đến muộn F4 chi phối, nên
@@ -726,6 +732,89 @@ Không run nào vượt số xe tối đa.
 4. **So với bài báo** (`data/paper/paper_objectives.csv`, cột NSGA-II): f1 của nhóm thấp hơn nhiều, ví dụ
    C102-100 là 15499 so với 158598 của họ. Nhưng mô hình hai bên khác nhau (cách cắt tuyến, đơn vị thời
    gian, các chỗ sửa công thức), nên chỉ đặt cạnh nhau trong báo cáo, không kết luận "tốt hơn bài báo".
+
+## Kết quả giai đoạn 3: tuning, ablation và cấu hình cuối (27/11)
+
+Số liệu đầy đủ, bảng HV/IGD từng cấu hình và lệnh tái hiện ở **`docs/ablation_results.md`** (bản PDF:
+`docs/ablation_results.pdf`). Mục này chỉ ghi các quyết định và lý do.
+
+### Cách làm
+
+- **Năm nhóm cải tiến** được ablation, mỗi nhóm là một bộ ghi đè config trong `scripts/ablation.py`:
+  I (`init_smart`, TV2), L (`local_search`, TV2), D (`diversity`, TV3), P (`dp_split` chế độ polish, TV4),
+  A (`adaptive_rates`, TV4). `dp_split` và `adaptive_rates` tách thành hai nhóm vì là hai cơ chế độc lập.
+- **12 cấu hình**: baseline, chỉ bật từng nhóm (5), bật hết (1), tắt đúng một nhóm (5).
+- **Bốn instance**: C102-25, R201-50, RC201-100, case29.
+- **Hai ngân sách**, lưu ở hai thí nghiệm riêng (`abl5_g200`, `abl5_g1000`):
+
+  | Ngân sách | Seed | Lý do |
+  |---|---|---|
+  | 200 thế hệ | 0–19 | bằng bài báo; ở mức này độ lệch chuẩn giữa các seed lớn (HV ± 0.1–0.25), 10 seed chỉ phát hiện được chênh lệch cỡ 1.3 lần độ lệch chuẩn, 20 seed phát hiện được cỡ 0.9 lần; chạy rẻ |
+  | 1000 thế hệ | 0–9 | gần hội tụ hơn (200 thế hệ chưa hội tụ, xem giai đoạn 1); độ lệch chuẩn nhỏ đi khoảng một nửa nên 10 seed đủ; gấp đôi seed thì tốn thêm vài giờ |
+
+  Seed 0–9 nằm trong 0–19 nên vẫn so được với kết quả cũ.
+- **Tuning dùng seed 100–104**, tách khỏi seed báo cáo, để tham số không bị chỉnh vừa khít với chính các
+  seed dùng để báo kết quả.
+- Chạy song song 16 tiến trình: 200 thế hệ mất 36 phút, 1000 thế hệ mất 85 phút.
+
+### Các quyết định
+
+| Quyết định | Giá trị | Lý do ngắn |
+|---|---|---|
+| Thời điểm tính hài lòng | `arrival` | `service_start` làm f3 gần như luôn bằng 1 (xem mục `satisfaction_time`) |
+| Số seed | 20 seed ở 200 thế hệ, 10 seed ở 1000 thế hệ | xem bảng ngân sách ở trên |
+| I, `init_smart` | **bật**, tỉ lệ nn/tw/random 20/20/60 | đóng góp lớn nhất, không tốn thêm lần đánh giá; tỉ lệ giữ mặc định vì tuning của TV2 không tìm được tỉ lệ thắng đều |
+| D, `diversity` | **bật**, `density: sde`, `k: 1`, `archive: false` | không tốn thêm; giúp rõ trên RC201-100 khi chạy lâu, trung tính ở chỗ khác; k và kiểu mật độ chọn bằng tuning (mình và TV4 tuning độc lập, cùng kết luận); archive không đổi gì khi `archive_size` = `n_pop` |
+| P, `dp_split` | **bật**, `mode: polish`, `polish_k: 10` | mọi seed trên 3 instance Solomon đều tăng HV (kiểm định cặp), tốn thêm khoảng 5% số lần đánh giá, khoảng 2 lần thời gian; K = 30 không đáng (tuning của TV4) |
+| `every_eval` | **không dùng** | trên RC201-100 tốt hơn polish chưa có ý nghĩa (p = 0.055) nhưng chậm hơn khoảng 9 lần |
+| A, `adaptive_rates` | **tắt** | không giúp, có chỗ hại (C102-25, 1000 thế hệ: ΔHV −0.151, p = 0.023); tắt A trong tổ hợp gần như luôn tốt hơn; TV4 cũng khuyên tắt |
+| L, `local_search` | **tắt** | so cùng số thế hệ thì có ích, nhưng tốn 3.4–7.8 lần số lần đánh giá; so **cùng số lần đánh giá** thì thua việc cho thuật toán chạy thêm thế hệ ở 3/4 instance |
+
+**Cấu hình cuối cho giai đoạn 4: I + D + P, tắt A và L**, khoảng 1.05 lần số lần đánh giá của baseline.
+Nếu cần báo cấu hình mạnh nhất theo số thế hệ cố định (như cách bài báo so), thì đó là I + L + D + P, nhưng
+phải ghi rõ nó tốn 3.4–7.7 lần số lần đánh giá.
+
+### Kết quả tóm tắt
+
+| Nhóm | Đứng riêng so với baseline | Bỏ khỏi tổ hợp thì sao |
+|---|---|---|
+| I | tốt hơn có ý nghĩa trên 4/4 instance (200 thế hệ) và 3/4 (1000 thế hệ); RC201-100 +0.40 / +0.29 HV | tụt mạnh nhất (200 thế hệ, RC201-100: +0.58 còn +0.21) |
+| L | có ý nghĩa trên 3/4 ở 200 thế hệ, mất ý nghĩa ở 1000 thế hệ | tụt vừa; rõ nhất trên case29 |
+| D | chỉ có ý nghĩa trên RC201-100 ở 1000 thế hệ (+0.055, p = 0.049) | gần như không đổi (±0.015) |
+| P | tăng ở mọi seed (kiểm định cặp), +0.02 đến +0.14 HV trên Solomon; case29 gần như không đổi | tụt nhẹ |
+| A | không giúp; hại trên C102-25 ở 1000 thế hệ | bỏ A thì tốt hơn hoặc ngang |
+
+**So cùng chi phí** (thí nghiệm `eqcost`): cấu hình có L chạy 200 thế hệ được so với cấu hình không L chạy
+1000 thế hệ, hai bên có số lần đánh giá gần bằng nhau. L đứng riêng thua baseline chạy thêm thế hệ trên cả
+4 instance (ΔHV −0.16 đến −0.25); trong tổ hợp, thêm L chỉ thắng trên C102-25 và thua có ý nghĩa ở ba
+instance còn lại. Đó là lý do tắt L.
+
+**Số lần đánh giá** (`n_evals`) là số lần gọi decoder để chấm một hoán vị, là thước đo chi phí chuẩn vì
+không phụ thuộc máy. Baseline: 80 + 80 × số thế hệ. I, D, A không chấm thêm; P chấm thêm 80 × K = 800 lần
+sau thế hệ cuối; L chấm mọi bước đi thử, kể cả bước bị loại. Hạn chế: một lần DP (P, `every_eval`) đắt hơn
+một lần split thường, nên với P và `every_eval` phải nhìn thêm thời gian chạy.
+
+### Lỗi phát hiện khi tuning
+
+`diversity.truncate` báo lỗi `np.lexsort` khi `k ≥ 3` và front cuối chỉ cần giữ rất ít cá thể (không đủ k
+láng giềng). Với `k = 1` (cấu hình đã chọn) lỗi không xảy ra, nên mọi kết quả ablation không bị ảnh hưởng.
+Đã sửa bằng bản của TV4 (merge `feat/tv4-phase4` ngày 27/11): khi không đủ k láng giềng thì mọi cá thể
+hoà nhau và bỏ chỉ số nhỏ nhất; với `k = 1, 2` kết quả giữ nguyên như trước.
+
+Cùng lần merge đó, mặc định `dp_split_params.mode` đổi từ `every_eval` sang `polish`, đúng với quyết định
+ở bảng trên. Việc này không đổi kết quả baseline vì `dp_split` vẫn mặc định tắt.
+
+### Chạy cấu hình cuối ở giai đoạn 4
+
+`config.yaml` vẫn để mọi cờ cải tiến **tắt** (đúng quy tắc "mặc định là baseline"). Giai đoạn 4 chạy cấu
+hình cuối bằng ghi đè, ví dụ:
+
+  ```powershell
+  python -m src.runner run --exp final --config IDP --instance C102 --n 25 `
+    --set improvements.init_smart=true `
+    --set improvements.diversity=true --set improvements.diversity_params.archive=false `
+    --set improvements.dp_split=true --set improvements.dp_split_params.mode=polish
+  ```
 
 ## Bốn cải tiến
 

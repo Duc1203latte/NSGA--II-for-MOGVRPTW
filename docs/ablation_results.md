@@ -83,9 +83,9 @@ lặp lại ở các lượt ablation với seed 0–19 (only_D trên case29 ở
 **Lỗi phát hiện khi tuning.** `diversity.truncate` báo lỗi `np.lexsort` khi k ≥ 3 và front cuối chỉ cần
 giữ rất ít cá thể (không đủ k láng giềng). Với k = 1 lỗi không xảy ra, nên mọi kết quả khác trong tài liệu
 này không bị ảnh hưởng. Hai cấu hình k = 3, k = 5 trong bảng trên chạy với một bản sửa tạm (dùng láng giềng
-xa nhất còn có) đã gỡ ra sau đó; `main` hiện vẫn là bản chưa sửa, bản sửa chính thức nằm ở nhánh
-`feat/tv4-phase4` của TV4 (khi thiếu láng giềng thì cho mọi cá thể hoà). Hai cách sửa chỉ khác nhau ở
-bước cắt cuối cùng khi còn ít hơn k cá thể.
+xa nhất còn có) đã gỡ ra sau đó. Bản sửa chính thức là của TV4 (khi thiếu láng giềng thì cho mọi cá thể
+hoà), đã merge vào `main` ngày 27/11. Hai cách sửa chỉ khác nhau ở bước cắt cuối cùng khi còn ít hơn k cá
+thể, nên chạy lại `k = 3, 5` bằng code hiện tại có thể cho số hơi khác bảng trên.
 
 Kết quả thô: `results/tune_div/`.
 
