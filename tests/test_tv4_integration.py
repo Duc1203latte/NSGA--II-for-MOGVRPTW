@@ -26,8 +26,10 @@ def make_cfg(n_gen, n_pop=None, **flags):
     cfg["nsga2"]["n_gen"] = n_gen
     if n_pop is not None:
         cfg["nsga2"]["n_pop"] = n_pop
+    dp_mode = flags.pop("dp_mode", "every_eval")   # config.yaml mặc định mode = polish; các test cũ kiểm every_eval
     for k in ("init_smart", "local_search", "diversity", "dp_split", "adaptive_rates"):
         cfg["improvements"][k] = flags.get(k, False)
+    cfg["improvements"]["dp_split_params"]["mode"] = dp_mode
     return cfg
 
 
@@ -46,7 +48,11 @@ def test_flags_off_identical_to_main(key):
     inst = load_instance(name, n, cfg)
     ref, res = FIXTURE["cases"][key], nsga2.run(inst, cfg, seed)
     assert res["pop"] == ref["pop"]
-    assert [[float(x).hex() for x in row] for row in res["F"]] == ref["F_hex"]   # từng bit
+    # F so với dung sai 1e-12 (tương đối), KHÔNG so từng bit: fixture sinh trên Windows, còn libm/BLAS của Linux
+    # (exp, sqrt, tổng nhiều số hạng) có thể lệch 1 ULP ở vài giá trị f2 dù hoán vị giống hệt. Hoán vị, CV, front
+    # và n_evals vẫn so chính xác, nên mọi lệch hướng tiến hoá (khác RNG, khác thứ tự chọn) vẫn bị bắt.
+    expected_F = np.array([[float.fromhex(x) for x in row] for row in ref["F_hex"]])
+    assert np.allclose(res["F"], expected_F, rtol=1e-12, atol=0)
     assert [float(x) for x in res["CV"]] == ref["CV"]
     assert [int(i) for i in res["front"]] == ref["front"]
     assert res["n_evals"] == ref["n_evals"]
@@ -263,3 +269,34 @@ def test_polish_is_deterministic_and_rejects_bad_mode():
     cfg["improvements"]["dp_split_params"]["mode"] = "nope"
     with pytest.raises(ValueError):
         nsga2.run(inst, cfg, 0)
+
+
+# ---------------------------------------------------------------- polish + diversity (archive của TV3)
+def _dominates_weakly(Fq, CVq, Fp, CVp):
+    """q trội yếu p theo luật ràng buộc: CV nhỏ hơn, hoặc CV bằng nhau và mọi mục tiêu không lớn hơn."""
+    return (CVq < CVp) | ((CVq == CVp) & np.all(Fq <= Fp, axis=1))
+
+
+def test_polish_on_diversity_archive():
+    """Có diversity + archive thì kết quả của tiến hoá là archive, và polish chạy trên archive đó."""
+    cfg_pol = make_cfg(6, n_pop=16, dp_split=True, diversity=True, dp_mode="polish")
+    cfg_div = make_cfg(6, n_pop=16, diversity=True)            # cùng diversity, không dp_split
+    assert cfg_pol["improvements"]["diversity_params"]["archive"] is True
+    k = cfg_pol["improvements"]["dp_split_params"]["polish_k"]
+    inst = load_instance("C102", 25, cfg_pol)
+    a, b = nsga2.run(inst, cfg_pol, 3), nsga2.run(inst, cfg_pol, 3)
+    plain = nsga2.run(inst, cfg_div, 3)
+    # tất định
+    assert a["pop"] == b["pop"] and np.array_equal(a["F"], b["F"]) and np.array_equal(a["CV"], b["CV"])
+    assert np.array_equal(a["front"], b["front"]) and np.array_equal(a["W"], b["W"], equal_nan=True)
+    # polish không đụng tới tiến hoá: archive trước polish == kết quả chạy diversity thuần cùng seed
+    pre = a["pre_polish"]
+    assert pre["pop"] == plain["pop"] and np.array_equal(pre["F"], plain["F"])
+    assert a["dp_mode"] == "polish" and a["n_dp_calls"] == len(pre["pop"]) * k
+    assert a["n_evals"] == plain["n_evals"] + len(pre["pop"]) * k
+    # front sau polish trội yếu archive trước polish: mọi điểm cũ bị một điểm front mới trội yếu (hoặc trùng)
+    Fn, Cn = a["F"][a["front"]], a["CV"][a["front"]]
+    for Fp, Cp in zip(pre["F"], pre["CV"]):
+        assert np.any(_dominates_weakly(Fn, Cn, Fp[None, :], Cp)), (Fp, Cp)
+    # các điểm front mới đều là điểm không trội trong tập đã polish
+    assert len(a["front"]) >= 1 and a["feasible_frac_front"] >= 0.0

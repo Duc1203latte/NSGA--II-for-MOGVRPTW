@@ -59,7 +59,11 @@ def truncate(F: np.ndarray, n_keep: int, method: str, k: int) -> np.ndarray:
         return alive
     D = distance_matrix(F, method)
     while len(alive) > n_keep:
-        sub = np.sort(D[np.ix_(alive, alive)], axis=1)[:, k - 1:]   # láng giềng thứ k trở đi
+        # láng giềng thứ k trở đi. Khi còn ít hơn k cá thể (k >= 3, chỉ còn 1-2 chỗ trống) thì không đủ k láng
+        # giềng: lấy cột cuối (inf của đường chéo) để mọi cá thể hoà, bỏ chỉ số nhỏ nhất. Không đổi gì khi
+        # còn >= k cá thể, nên kết quả với k = 1, 2 giữ nguyên (TV4 sửa lỗi lexsort rỗng khi k >= 3).
+        srt = np.sort(D[np.ix_(alive, alive)], axis=1)
+        sub = srt[:, min(k - 1, srt.shape[1] - 1):]
         worst = np.lexsort(sub.T[::-1])[0]                          # nhỏ nhất theo thứ tự từ điển
         alive = np.delete(alive, worst)
     return alive

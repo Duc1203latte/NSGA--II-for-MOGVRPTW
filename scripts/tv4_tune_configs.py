@@ -19,7 +19,20 @@ V2_FIXED = [AP + "pc_min=0.7", AP + "pc_max=0.7", AP + "pm_min=0.1", AP + "pm_ma
 STATIC = {
     "baseline": [],
     "baseline_g300": ["nsga2.n_gen=300"],   # đối chứng: baseline với ~1.5x thế hệ, cùng cỡ chi phí với polish
-    "dp_every_eval": ["improvements.dp_split=true"],
+    # --- tv4_combo: tuong tac cac cai tien (init_smart, local_search cua TV2; diversity sde k=1 cua TV3; dp_split cua TV4)
+    "ls": ["improvements.local_search=true"],
+    "polish": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
+    "ls_polish": ["improvements.local_search=true", "improvements.dp_split=true", DPP + "mode=polish",
+                  DPP + "polish_k=10"],
+    "init_ls": ["improvements.init_smart=true", "improvements.local_search=true"],
+    "all_on": ["improvements.init_smart=true", "improvements.local_search=true", "improvements.diversity=true",
+               "improvements.diversity_params.density=sde", "improvements.diversity_params.k=1",
+               "improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
+    "all_on_every_eval": ["improvements.init_smart=true", "improvements.local_search=true",
+                          "improvements.diversity=true", "improvements.diversity_params.density=sde",
+                          "improvements.diversity_params.k=1", "improvements.dp_split=true",
+                          DPP + "mode=every_eval"],
+    "dp_every_eval": ["improvements.dp_split=true", DPP + "mode=every_eval"],
     "dp_polish_k10": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
     "dp_polish_k30": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=30"],
     "adapt_v1": ["improvements.adaptive_rates=true", *V1_RANGES],
@@ -31,9 +44,28 @@ def stag(g, b):
     return [AP + f"stagnation_gens={g}", AP + f"boost={b}"]
 
 
+# --- diversity cua TV3: div_<density>_k<K>_<arc|noarc>; hau to _polish them dp_split mode=polish K=10 (chay sau khi chon tot nhat)
+DVP = "improvements.diversity_params."
+DIV_CONFIGS = ["div_sde_k1_arc", "div_sde_k1_noarc", "div_sde_k3_arc", "div_knn_k1_arc", "div_knn_k3_arc", "div_knn_k5_arc"]
+
+
+def div_overrides(name: str) -> list[str] | None:
+    m = re.fullmatch(r"div_(sde|knn)_k(\d+)_(arc|noarc)(_polish)?", name)
+    if not m:
+        return None
+    dens, k, arc, pol = m.group(1), int(m.group(2)), m.group(3) == "arc", m.group(4)
+    out = ["improvements.diversity=true", DVP + f"density={dens}", DVP + f"k={k}", DVP + f"archive={'true' if arc else 'false'}"]
+    if pol:
+        out += ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"]
+    return out
+
+
 def overrides(name: str) -> list[str]:
     if name in STATIC:
         return STATIC[name]
+    d = div_overrides(name)
+    if d is not None:
+        return d
     m = re.fullmatch(r"adapt_(v2|v3)_g(\d+)_b([\d.]+)", name)
     if not m:
         raise KeyError(name)

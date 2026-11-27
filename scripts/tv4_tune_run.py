@@ -45,7 +45,7 @@ def main() -> None:
     logdir.mkdir(parents=True, exist_ok=True)
     # việc dài (dp chấm mọi cá thể, R201-50) chạy trước để cân tải
     jobs = [(n, nm, c, s) for c in args.configs for (nm, n) in INSTANCES for s in args.seeds]
-    jobs.sort(key=lambda j: (j[2] != "dp_every_eval", j[0] != 50))
+    jobs.sort(key=lambda j: (j[2] not in ("dp_every_eval", "all_on_every_eval"), j[0] != 50))
     t0, failed = time.perf_counter(), []
     with ThreadPoolExecutor(args.jobs) as pool:
         futs = [pool.submit(job, args.exp, nm, n, c, s, logdir) for n, nm, c, s in jobs]

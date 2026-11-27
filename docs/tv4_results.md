@@ -252,6 +252,100 @@ Chi phí một thế hệ baseline lấy từ `tv4_tune/cpu_cost.csv` (baseline,
 - **So với `dp` chấm mọi cá thể** (cùng reference set, 200 thế hệ): `baseline_polish` đạt HV 0.921 so với 0.936 của `dp` ở C102-25 (khoảng 83% mức tăng của `dp` so với baseline) và 0.748 so với 0.728 ở R201-50 (cao hơn `dp`), với một phần mười chi phí CPU của `dp` (xem bảng tuning). Chưa kiểm định thống kê cặp này.
 - **Giới hạn.** 10 seed, hai instance, và n_gen = 1400/3500 do tôi chọn để xấp xỉ chi phí của `dp`, không phải ngân sách cuối của nhóm; kết luận cần xác nhận lại khi nhóm chốt ngân sách.
 
+## Tuning: diversity (TV3)
+
+Thí nghiệm `tv4_tune_div`, C102-25 và R201-50, **chỉ seed 100–104**, n_gen = 200, `archive_size` = 80 (= n_pop, để số điểm front ngang baseline), mọi tiến trình `OMP_NUM_THREADS=1`. Cấu hình định nghĩa ở `scripts/tv4_tune_configs.py` (`div_<sde|knn>_k<K>_<arc|noarc>`, hậu tố `_polish` thêm `dp_split` `mode=polish`, `polish_k=10`). Không đổi mặc định `diversity_params` trong `config.yaml` (sẽ thống nhất với TV3).
+
+- `div_sde_k1_arc` là mặc định hiện tại của TV3. `div_sde_k1_noarc` là cùng cấu hình không archive.
+- `div_sde_k3_arc`, `div_knn_k1_arc`, `div_knn_k3_arc`, `div_knn_k5_arc`: đổi độ đo mật độ và k.
+- `div_sde_k1_arc_polish`: cấu hình tốt nhất ở trên (chọn trước khi chạy cấu hình này) cộng polish K = 10, cùng seed.
+
+**Lỗi tìm thấy khi tuning (đã sửa, nằm trong file của TV3).** Với k >= 3, `truncate` trong `src/improvements/diversity.py` báo `TypeError: need sequence of keys with len > 0 in lexsort` khi front cuối chỉ còn 1–2 chỗ trống (ít hơn k láng giềng), nên `sde_k3`, `knn_k3`, `knn_k5` đều sập ở lần chạy đầu. Tôi sửa tối thiểu: khi còn ít hơn k cá thể thì lấy cột cuối của hàng khoảng cách đã sắp (inf của đường chéo), cho mọi cá thể hoà và bỏ chỉ số nhỏ nhất. Không đổi gì khi còn >= k cá thể, nên kết quả với k = 1, 2 giữ nguyên; có test `test_truncate_fewer_neighbors_than_k`. Cần TV3 xem lại.
+
+### Kết quả
+
+| Instance | Cấu hình | HV | ΔHV vs baseline | p (HV) | IGD | p (IGD) | SP | Số điểm front | CPU so với baseline | ΔHV so với bản chưa polish (cặp) | p (HV), signed-rank |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| C102-25 | baseline | 0.8925 ± 0.1617 | — | — | 0.1759 ± 0.0739 | — | 0.0399 ± 0.0122 | 9.8 | 1.00 | — | — |
+| C102-25 | div_sde_k1_arc | 0.8826 ± 0.1602 | -0.0099 | 0.602 | 0.1823 ± 0.0663 | 0.754 | 0.0237 ± 0.0177 | 12.0 | 0.98 | — | — |
+| C102-25 | div_sde_k1_noarc | 0.8826 ± 0.1602 | -0.0099 | 0.602 | 0.1823 ± 0.0663 | 0.754 | 0.0237 ± 0.0177 | 12.0 | 0.96 | — | — |
+| C102-25 | div_sde_k3_arc | 0.8711 ± 0.1483 | -0.0213 | 0.917 | 0.1873 ± 0.0955 | 0.917 | 0.0361 ± 0.0258 | 12.0 | 1.00 | — | — |
+| C102-25 | div_knn_k1_arc | 0.9112 ± 0.1309 | +0.0188 | 0.754 | 0.1638 ± 0.0733 | 0.754 | 0.0332 ± 0.0138 | 11.6 | 1.00 | — | — |
+| C102-25 | div_knn_k3_arc | 0.8454 ± 0.2124 | -0.0470 | 0.251 | 0.2073 ± 0.0969 | 0.465 | 0.0366 ± 0.0417 | 13.0 | 1.05 | — | — |
+| C102-25 | div_knn_k5_arc | 0.8806 ± 0.1264 | -0.0119 | 0.917 | 0.1706 ± 0.0662 | 0.754 | 0.0393 ± 0.0139 | 11.6 | 1.15 | — | — |
+| C102-25 | div_sde_k1_arc_polish | 0.9139 ± 0.1438 | +0.0215 | 0.602 | 0.1549 ± 0.0791 | 0.754 | 0.0484 ± 0.0329 | 15.8 | 1.11 | +0.0313 ± 0.0221 | 0.062 |
+| R201-50 | baseline | 0.8799 ± 0.1076 | — | — | 0.1731 ± 0.0536 | — | 0.0270 ± 0.0159 | 19.0 | 1.00 | — | — |
+| R201-50 | div_sde_k1_arc | 0.8968 ± 0.1714 | +0.0169 | 0.917 | 0.1818 ± 0.0864 | 0.917 | 0.0203 ± 0.0027 | 17.8 | 1.01 | — | — |
+| R201-50 | div_sde_k1_noarc | 0.8968 ± 0.1714 | +0.0169 | 0.917 | 0.1818 ± 0.0864 | 0.917 | 0.0203 ± 0.0027 | 17.8 | 0.98 | — | — |
+| R201-50 | div_sde_k3_arc | 0.7977 ± 0.0544 | -0.0821 | 0.251 | 0.2156 ± 0.0308 | 0.175 | 0.0238 ± 0.0089 | 15.6 | 1.02 | — | — |
+| R201-50 | div_knn_k1_arc | 0.8604 ± 0.1478 | -0.0195 | 0.754 | 0.1966 ± 0.0756 | 0.602 | 0.0204 ± 0.0034 | 21.4 | 1.03 | — | — |
+| R201-50 | div_knn_k3_arc | 0.7858 ± 0.0814 | -0.0941 | 0.047 | 0.2281 ± 0.0442 | 0.076 | 0.0303 ± 0.0060 | 17.8 | 1.04 | — | — |
+| R201-50 | div_knn_k5_arc | 0.9002 ± 0.1628 | +0.0203 | 0.754 | 0.1694 ± 0.0762 | 0.917 | 0.0241 ± 0.0138 | 19.2 | 1.01 | — | — |
+| R201-50 | div_sde_k1_arc_polish | 0.9376 ± 0.1752 | +0.0577 | 0.602 | 0.1509 ± 0.0945 | 0.917 | 0.0530 ± 0.0359 | 25.6 | 1.29 | +0.0408 ± 0.0236 | 0.062 |
+
+Mỗi ô: trung bình ± độ lệch chuẩn qua 5 seed; p-value Wilcoxon rank-sum hai phía so với `baseline` (với 5 seed mỗi bên, p nhỏ nhất đạt được khoảng 0.008), chưa hiệu chỉnh đa so sánh; cột cuối là so cặp theo seed (signed-rank; với 5 cặp p nhỏ nhất là 0.0625). "CPU so với baseline" là thời gian CPU tuần tự (`time.process_time`, trung bình seed 100 và 101). HV, IGD và SP dùng reference set gộp của 8 cấu hình trên mỗi instance, **không so được với các bảng khác**.
+
+### Đọc kết quả
+
+- **Không cấu hình diversity nào phân biệt được với baseline.** Mọi p (HV, IGD) >= 0.17 trừ `knn_k3` kém hơn baseline ở R201-50 (HV p = 0.047, IGD p = 0.076). Độ lệch chuẩn giữa các seed (0.05–0.3) lớn hơn chênh lệch trung bình (|ΔHV| <= 0.1).
+- **Archive không có tác dụng ở `archive_size` = n_pop:** `sde_k1_arc` và `sde_k1_noarc` cho đúng từng chữ số cùng kết quả trên cả 10 run, khớp mục 5 của báo cáo TV3 (front 1 nhỏ hơn quần thể nên archive trùng front cuối).
+- **k lớn không giúp:** `sde_k3` kém `sde_k1` ở cả hai instance (R201-50: ΔHV −0.082 so với +0.017), `knn_k3` kém nhất (R201-50 p = 0.047). `knn_k5` ngang `sde_k1`, `knn_k1` trái dấu giữa hai instance (C102-25 +0.019, R201-50 −0.020).
+- **Chi phí:** `sde_k1` bằng baseline (0.96–1.01x); `knn_k5` đắt nhất (1.15x ở C102-25), mọi cái khác trong khoảng 1.00–1.05x.
+- **Chọn: `sde`, k = 1, archive tuỳ ý (kết quả y hệt; giữ mặc định hiện tại).** Lý do một dòng: ở bước chọn (bảng 7 cấu hình trước khi chạy polish) nó có ΔHV trung bình hai instance cao nhất (+0.033, so với +0.025 của `knn_k5`), cùng cấu hình TV3 đã chọn, và không tốn thêm CPU. **Thiên lệch chọn lọc:** chọn trên 5 seed, cũng chính những seed dùng để báo kết quả tuning, trong 6 cấu hình, nên mức tăng đó chắc chắn bị phóng đại; ngoài ra thứ hạng không ổn định, vì khi thêm cấu hình polish vào reference set (bảng trên) ΔHV trung bình của `sde_k1` còn +0.004, ngang `knn_k5` (+0.004) và `knn_k1` (−0.0004). Nói cách khác ba cấu hình này không phân biệt được với nhau, và sde_k1 được giữ chủ yếu vì không có lý do đổi.
+- **Polish cộng thêm lên diversity?** Có về số tuyệt đối, theo đúng cấu tạo: cả 5 seed ở cả hai instance đều tốt lên (ΔHV cặp +0.031 ở C102-25, +0.041 ở R201-50; p = 0.0625 là giá trị nhỏ nhất có thể với 5 cặp, nên không "kém ý nghĩa" hơn mức tối đa có thể), front thêm điểm (12.0 lên 15.8; 17.8 lên 25.6) với chi phí CPU thêm khoảng 0.3 s và 1.1 s mỗi run (1.11x và 1.29x baseline). Như ở mục "Polish at a converged budget", so có/không polish là đơn điệu theo cấu tạo, nên đây không phải bằng chứng hiệu quả; so với baseline, `sde_k1 + polish` vẫn không có ý nghĩa thống kê (HV p = 0.602 ở cả hai instance). Polish và diversity chạy chung được (polish chạy trên archive, có test).
+- **Giới hạn.** 5 seed, hai instance, n_gen = 200 chưa chốt; bảng chỉ để chọn tham số. Kết luận cần xác nhận bằng seed 0–9 (và RC201-100, case29, nơi TV3 thấy SDE khác nhau).
+
+## Interaction of improvements
+
+Thí nghiệm `tv4_combo` sau khi merge TV2 (`init_smart`, `local_search`) vào `main`: C102-25 và R201-50, **chỉ seed 100–104**, n_gen = 200, mọi tiến trình `OMP_NUM_THREADS=1`; cấu hình ở `scripts/tv4_tune_configs.py`. `adaptive_rates` tắt ở mọi cấu hình; `diversity` là `sde`, k = 1, archive bật (mặc định hiện tại).
+
+- `ls` = `local_search`; `polish` = `dp_split` mode polish K = 10; `init_ls` = `init_smart` + `local_search`.
+- `all_on` = `init_smart` + `local_search` + `diversity` + `dp_split` (polish).
+- `all_on_every_eval` = như `all_on` nhưng `dp_split` mode `every_eval`: kiểm xem DP chấm mọi cá thể và LS có xung đột không (LS phải cắt lại tuyến bằng đúng trọng số của cá thể đó).
+
+### Kết quả
+
+| Instance | Cấu hình | HV | ΔHV vs baseline | p (HV) | IGD | p (IGD) | n_evals | n_dp_calls | CPU so với baseline | Khả thi (front) | Số điểm front |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| C102-25 | baseline | 0.8529 ± 0.1491 | — | — | 0.4301 ± 0.0576 | — | 16080 | 0 | 1.00 | 1.00 | 9.8 |
+| C102-25 | ls | 0.9107 ± 0.0993 | +0.0578 | 0.347 | 0.3873 ± 0.0532 | 0.175 | 63681 | 0 | 3.86 | 1.00 | 12.2 |
+| C102-25 | polish | 0.9218 ± 0.1362 | +0.0690 | 0.251 | 0.2714 ± 0.0728 | 0.016 | 16880 | 800 | 1.56 | 1.00 | 21.0 |
+| C102-25 | ls_polish | 0.9759 ± 0.1309 | +0.1230 | 0.076 | 0.2388 ± 0.0892 | 0.009 | 64481 | 800 | 4.69 | 1.00 | 20.8 |
+| C102-25 | init_ls | 1.1941 ± 0.0079 | +0.3413 | 0.009 | 0.3374 ± 0.0019 | 0.009 | 57468 | 0 | 3.48 | 1.00 | 5.8 |
+| C102-25 | all_on | 1.2235 ± 0.0015 | +0.3706 | 0.009 | 0.2221 ± 0.0183 | 0.009 | 56673 | 40 | 3.15 | 1.00 | 5.8 |
+| C102-25 | all_on_every_eval | 1.2511 ± 0.0026 | +0.3982 | 0.009 | 0.0545 ± 0.0044 | 0.009 | 50582 | 16080 | 35.38 | 1.00 | 17.6 |
+| R201-50 | baseline | 0.5568 ± 0.0632 | — | — | 0.3175 ± 0.0337 | — | 16080 | 0 | 1.00 | 1.00 | 19.0 |
+| R201-50 | ls | 0.5450 ± 0.0332 | -0.0118 | 0.917 | 0.3190 ± 0.0230 | 0.917 | 116800 | 0 | 6.82 | 1.00 | 36.0 |
+| R201-50 | polish | 0.6067 ± 0.0570 | +0.0500 | 0.175 | 0.2636 ± 0.0354 | 0.047 | 16880 | 800 | 1.92 | 1.00 | 32.2 |
+| R201-50 | ls_polish | 0.5753 ± 0.0240 | +0.0185 | 0.754 | 0.2789 ± 0.0198 | 0.076 | 117600 | 800 | 7.97 | 1.00 | 66.8 |
+| R201-50 | init_ls | 0.7467 ± 0.0768 | +0.1899 | 0.009 | 0.2094 ± 0.0389 | 0.009 | 103240 | 0 | 5.75 | 1.00 | 55.0 |
+| R201-50 | all_on | 0.7615 ± 0.0656 | +0.2047 | 0.009 | 0.1861 ± 0.0247 | 0.009 | 102002 | 652 | 5.66 | 1.00 | 78.2 |
+| R201-50 | all_on_every_eval | 0.9779 ± 0.0389 | +0.4212 | 0.009 | 0.0526 ± 0.0214 | 0.009 | 69142 | 16080 | 94.73 | 1.00 | 80.0 |
+
+Mỗi ô: trung bình ± độ lệch chuẩn qua 5 seed; p-value Wilcoxon rank-sum hai phía so với `baseline` (5 seed mỗi bên: p nhỏ nhất khoảng 0.008), chưa hiệu chỉnh đa so sánh. `n_evals` tính cả các lần chấm bên trong LS. "CPU so với baseline" là thời gian CPU tuần tự (`time.process_time`, trung bình seed 100 và 101). HV và IGD dùng reference set gộp của 7 cấu hình trên mỗi instance, **không so được với các bảng khác**; vì `all_on_every_eval` rất mạnh nên HV của các cấu hình còn lại bị nén lại, đọc theo thứ hạng và hiệu cặp hơn là theo giá trị tuyệt đối.
+
+### So cặp theo seed (Wilcoxon signed-rank; với 5 cặp p nhỏ nhất là 0.0625)
+
+| So sánh | C102-25 ΔHV (số seed tốt hơn) | R201-50 ΔHV (số seed tốt hơn) |
+|---|---|---|
+| `ls_polish` − `ls` (polish có thêm trên nền LS?) | +0.065 (5/5, p = 0.062) | +0.030 (5/5, p = 0.062) |
+| `ls_polish` − `polish` (LS có thêm trên nền polish?) | +0.054 (4/5, p = 0.438) | −0.032 (2/5, p = 0.312) |
+| `polish` − `baseline` | +0.069 (5/5, p = 0.062) | +0.050 (5/5, p = 0.062) |
+| `ls` − `baseline` | +0.058 (4/5, p = 0.625) | −0.012 (2/5, p = 0.812) |
+| `init_ls` − `ls` (tác dụng của `init_smart`) | +0.283 (5/5, p = 0.062) | +0.202 (5/5, p = 0.062) |
+| `all_on` − `init_ls` (diversity + polish thêm vào) | +0.029 (5/5, p = 0.062) | +0.015 (2/5, p = 1.000) |
+| `all_on_every_eval` − `all_on` | +0.028 (5/5, p = 0.062) | +0.217 (5/5, p = 0.062) |
+
+### Đọc kết quả
+
+- **`ls_polish` có tốt hơn từng cái riêng lẻ không?** Hơn `ls` (cả 5 seed, cả hai instance), nhưng đó là điều hiển nhiên theo cấu tạo của polish (thêm điểm vào tập, không bao giờ làm HV giảm), nên không phải bằng chứng. Hơn `polish` đơn lẻ thì **không rõ**: C102-25 +0.054 (4/5 seed, p = 0.44), R201-50 −0.032 (2/5 seed, p = 0.31). Nói cách khác, polish vẫn cộng thêm trên nền LS (như trên nền baseline), còn LS không cộng thêm gì trên nền polish ở ngân sách 200 thế hệ, với chi phí CPU gấp 3–4 lần (C102-25: 4.69x so với 1.56x) và 4 lần (R201-50: 7.97x so với 1.92x). Bản thân `ls` không phân biệt được với baseline (p >= 0.17 cho cả HV và IGD, ở R201-50 HV còn âm). Đây là chi phí chưa được tính khi so theo thế hệ: LS có `n_evals` gấp 4–7 lần baseline.
+- **`init_smart` là thành phần cho thay đổi lớn nhất:** `init_ls` hơn `ls` +0.28 và +0.20 HV (5/5 seed ở cả hai instance) và hơn baseline với p = 0.009 ở cả hai instance, front C102-25 chỉ còn 5.8 điểm (HV rất cao, độ lệch chuẩn 0.008, tức quần thể hội tụ về vùng nhỏ). Không có cấu hình `init_smart` đứng riêng nên không tách được phần `init_smart` khỏi tương tác với LS; hiệu `init_ls` − `ls` đã là hiệu ứng của `init_smart` khi có LS.
+- **`all_on` so với `init_ls`:** thêm diversity + polish cho +0.029 HV (5/5 seed) ở C102-25 nhưng chỉ +0.015 (2/5 seed, p = 1.0) ở R201-50, nên chưa có bằng chứng cho đóng góp ổn định ở n = 50, và `all_on` có front 78 điểm so với 55 của `init_ls`.
+- **DP `every_eval` và LS không xung đột, kèm một giới hạn.** Cả 10 lượt chạy `all_on_every_eval` chạy xong, 100% nghiệm khả thi, và đây là cấu hình tốt nhất ở cả hai instance (HV 1.25 và 0.98, IGD 0.05 ở cả hai, p = 0.009 so với baseline). Về tính đúng: `scripts.tv2_dp_compat_check` PASS và các test `ls_dp`, `both_dp_adaptive` của `tests/test_tv2_integration.py` (kiểm F của NSGA-II bằng F chấm lại độc lập bằng `evaluate_dp` với trọng số riêng của từng cá thể) PASS. **Giới hạn:** khi bật `diversity` với archive thì kết quả cuối là archive và không giữ trọng số DP (`W = None`), nên với `all_on_every_eval` không chấm lại độc lập F cuối được (báo cáo `tv4_report` bỏ qua cột số xe cho cấu hình này); phần đúng đắn dựa vào các test trên chứ không vào kiểm lại kết quả cuối.
+- **`all_on_every_eval` rất đắt:** 35x (C102-25) và 95x (R201-50) CPU của baseline (78 s và 401 s mỗi run), và chưa so với baseline chạy cùng CPU. Ở mục "Equal-time comparison", baseline chạy lâu vượt `dp` chấm mọi cá thể khi cùng CPU, nên kết quả này chưa chứng minh `every_eval` đáng giá; cần so với `all_on` hoặc `baseline` ở ngân sách CPU tương đương trước khi dùng.
+- **Chi phí của `all_on`:** 3.15x (C102-25) và 5.66x (R201-50) CPU của baseline, chủ yếu do LS. Ở n = 100: một run `all_on` trên RC201-100 (seed 100, n_gen = 200, tuần tự) mất **162 s CPU (177 s thời gian tường)**, so với 19.6 s CPU của baseline (8.2x), tức khoảng 27 phút cho 10 seed ở 200 thế hệ, và tỉ lệ với số thế hệ nếu ngân sách cuối dài hơn (`n_evals` = 132 043, `n_dp_calls` = 400, front 97 điểm, 100% khả thi). `all_on_every_eval` chưa đo ở n = 100 (ở n = 50 đã mất 401 s mỗi run, và DP đắt hơn khi n tăng: khoảng 28x baseline ở n = 100 chỉ riêng DP), nên dự trù cho TV1 phải coi nó là rất đắt.
+- **Giới hạn.** 5 seed (p nhỏ nhất của mọi so cặp là 0.0625), hai instance, n_gen = 200 chưa chốt, chưa so cùng CPU, `init_smart` không có cấu hình đứng riêng, và các cấu hình được chọn từ trước (không chọn theo kết quả).
+
 ## Recommendations
 
 | Cờ | Đề xuất (chưa áp dụng vào `config.yaml`) | Lý do |
@@ -259,6 +353,8 @@ Chi phí một thế hệ baseline lấy từ `tv4_tune/cpu_cost.csv` (baseline,
 | `dp_split` | `mode: polish`, `polish_k: 10` | lợi ích còn nguyên ở ngân sách đã hội tụ (10/10 seed, p = 0.002, chỉ tốn khoảng 6% CPU của run dài) và ở đó tốt hơn việc dùng cùng CPU cho thêm thế hệ; K = 30 không đáng thêm; lưu ý đây là bước hoàn thiện cuối chứ không thay cho ngân sách, vì ở 200 thế hệ chạy thêm thế hệ ngang hoặc tốt hơn |
 | `adaptive_rates` | giữ **tắt** | cơ chế tăng pm khi trì trệ gần như không bao giờ kích hoạt (0–15 trên 200 thế hệ ở C102-25, 0 ở R201-50, vì front 1 đổi gần như mỗi thế hệ), nên `v3` thực chất bằng `v1` và `v2` bằng baseline; `v1` chỉ bỏ được suy giảm của bản mặc định, chưa có cải thiện; muốn dùng cần đổi tiêu chí trì trệ trước |
 | `dp_split` kiểu `every_eval` | không dùng làm mặc định | tốn 9–20 lần CPU của baseline, và `baseline_polish` đạt HV ngang hoặc cao hơn ở 200 thế hệ với một phần mười chi phí |
+| `diversity` (của TV3) | giữ `sde`, k = 1 (mặc định hiện tại); không dùng k >= 3 | không cấu hình nào khác baseline có ý nghĩa với 5 seed; k lớn kém hơn; archive không đổi gì ở `archive_size` = n_pop; chưa đổi `config.yaml`, cần thống nhất với TV3 |
+
 
 ## Ghi chú
 
