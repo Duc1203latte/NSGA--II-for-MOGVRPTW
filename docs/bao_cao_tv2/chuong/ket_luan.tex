@@ -1,0 +1,19 @@
+\chapter*{KẾT LUẬN}
+\addcontentsline{toc}{chapter}{Kết luận}
+
+Phần việc TV2 đã hoàn thành hai cải tiến cho thuật toán NSGA-II giải bài toán MOGVRPTW của nhóm. Khởi tạo
+thông minh tạo quần thể ban đầu từ thứ tự láng giềng gần nhất, thứ tự theo khung giờ và hoán vị ngẫu
+nhiên theo tỉ lệ cấu hình, có biến thể và khử trùng. Tìm kiếm cục bộ cải thiện từng con bằng 2-opt và
+Or-opt trong từng tuyến, chấm mọi ứng viên bằng đúng bộ đánh giá của thuật toán, có hai tiêu chí chấp
+nhận, hai chính sách xử lý lệch biên tuyến và ngân sách đánh giá cố định. Cả hai đã được gắn vào
+\code{nsga2.py} của nhóm, chạy được cùng các cải tiến của TV3 và TV4, và khi tắt cờ thì kết quả trùng từng
+bit với thuật toán gốc. Toàn bộ 432 test của dự án đều pass.
+
+Thực nghiệm trên bốn instance với 10 seed cho thấy khởi tạo thông minh tăng HV có ý nghĩa thống kê trên cả
+bốn instance mà không tốn thêm lần đánh giá nào. Tìm kiếm cục bộ đứng riêng ít hiệu quả vì phần lớn bước
+đi bị lệch biên tuyến với cách cắt \code{capacity\_time}; chính sách \code{evaluate\_actual} khắc phục được
+một phần. Kết hợp hai cải tiến cho HV cao nhất ở cùng 200 thế hệ trên cả bốn instance, và vẫn tốt hơn thuật
+toán gốc được cấp cùng số lần đánh giá trên C102-25 và RC201-100.
+
+Hướng tiếp theo là đánh giá tăng dần để giảm chi phí tìm kiếm cục bộ, thêm bước đi giữa các tuyến, chọn
+lại chính sách lệch biên mặc định và mở rộng thực nghiệm ra đủ chín instance của bài báo.

@@ -1,0 +1,20 @@
+\chapter*{LỜI MỞ ĐẦU}
+\addcontentsline{toc}{chapter}{Lời mở đầu}
+
+Bài tập lớn của nhóm cài đặt thuật toán NSGA-II cho bài toán định tuyến xe xanh đa mục tiêu có khung
+thời gian (MOGVRPTW), dựa trên mô hình của bài báo Li và cộng sự năm 2025~\cite{li2025}. Bài toán có ba mục tiêu xung
+đột nhau: chi phí giao hàng, lượng khí thải CO\textsubscript{2} và mức hài lòng của khách hàng. Sau khi
+có thuật toán gốc, nhóm bổ sung bốn cải tiến. Mỗi cải tiến do một thành viên phụ trách, có cờ bật tắt
+riêng trong tệp cấu hình và mặc định ở trạng thái tắt, để có thể đo đóng góp của từng cải tiến.
+
+Báo cáo này trình bày phần việc của thành viên thứ hai (TV2) gồm hai cải tiến: khởi tạo quần thể thông
+minh (\code{init\_smart}) và tìm kiếm cục bộ trong từng tuyến (\code{local\_search}). Ngoài hai mô-đun
+thuật toán, phần việc còn gồm bộ kiểm thử, gắn cải tiến vào vòng lặp NSGA-II của nhóm, kiểm tra hồi
+quy để bảo đảm khi tắt cờ thì kết quả trùng khớp với thuật toán gốc, chạy thực nghiệm so sánh trên
+nhiều bộ dữ liệu và vẽ các biểu đồ kết quả.
+
+Nội dung được trình bày theo thứ tự: bài toán và nhiệm vụ của TV2 (Chương~1), cơ sở lý thuyết
+(Chương~2), thiết kế và cài đặt khởi tạo thông minh (Chương~3), thiết kế và cài đặt tìm kiếm cục bộ
+(Chương~4), tích hợp vào NSGA-II và kiểm thử (Chương~5), thực nghiệm (Chương~6), tiến độ cùng những
+việc còn cần hoàn thiện (Chương~7). Mọi số liệu trong báo cáo được lấy từ các lần chạy thật trên mã
+nguồn của nhóm; cách tái lập từng bảng và từng hình được ghi ở phần phụ lục.

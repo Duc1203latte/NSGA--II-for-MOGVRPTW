@@ -1,0 +1,180 @@
+\chapter{TÍCH HỢP VÀO NSGA-II VÀ KIỂM THỬ}
+\label{chap:tichhop}
+
+\section{Vị trí gắn trong vòng lặp}
+
+Hình~\ref{fig:flow} là luồng một lần chạy NSGA-II sau khi gắn hai cải tiến. Ô nét đứt là phần chỉ chạy
+khi cờ tương ứng bật; khi tắt, luồng đi đúng các ô của thuật toán gốc.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.9cm,
+  stp/.style={draw, rounded corners=2pt, minimum width=5.2cm, minimum height=0.75cm,
+               font=\small, align=center},
+  tv2/.style={stp, dashed, draw=hustred, fill=hustred!6},
+  tv4/.style={stp, dashed, draw=grayline, fill=black!4},
+  dec/.style={draw, diamond, aspect=2.6, inner sep=1pt, font=\small, align=center},
+  arr/.style={-{Stealth[length=2mm]}, thick}]
+  \node[dec] (c1) {\code{init\_smart} bật?};
+  \node[tv2, minimum width=5.6cm] (i1) at ($(c1)+(-3.4,-1.6)$) {quần thể NN / TW / ngẫu nhiên\\ (\code{smart\_initial\_population})};
+  \node[stp, minimum width=5.6cm] (i0) at ($(c1)+(3.4,-1.6)$) {$N_{pop}$ hoán vị ngẫu nhiên\\ (thuật toán gốc)};
+  \node[stp] (ev0) at ($(c1)+(0,-3.1)$) {đánh giá quần thể đầu};
+  \node[stp, below=of ev0] (sel) {giải đấu nhị phân chọn cha mẹ};
+  \node[stp, below=of sel] (cx) {lai ghép OX (xác suất $p_c$)};
+  \node[stp, below=of cx] (mu) {đột biến (xác suất $p_m$)};
+  \node[tv4, below=of mu] (w) {gán trọng số DP cho con (TV4, nếu bật)};
+  \node[tv2, below=of w] (ls) {với xác suất $p_{ls}$: tìm kiếm cục bộ\\ (\code{local\_search\_children})};
+  \node[stp, below=of ls] (ev) {đánh giá các con chưa có kết quả};
+  \node[stp, below=of ev] (sur) {gộp cha mẹ và con, chọn lọc môi trường};
+  \draw[arr] (c1.west) -| node[pos=0.25, above, font=\footnotesize] {có} (i1.north);
+  \draw[arr] (c1.east) -| node[pos=0.25, above, font=\footnotesize] {không} (i0.north);
+  \draw[arr] (i1.south) |- (ev0.west);
+  \draw[arr] (i0.south) |- (ev0.east);
+  \foreach \a/\b in {ev0/sel, sel/cx, cx/mu, mu/w, w/ls, ls/ev, ev/sur} \draw[arr] (\a) -- (\b);
+  \draw[arr] (sur.east) -- ++(1.1,0) |- node[pos=0.25, right, font=\footnotesize, align=left]
+        {lặp $G$\\ thế hệ} (sel.east);
+\end{tikzpicture}
+\caption{Luồng NSGA-II của nhóm và hai điểm gắn của TV2 (viền đỏ nét đứt)}
+\label{fig:flow}
+\end{figure}
+
+\section{Điểm gắn khởi tạo}
+
+Trong \code{nsga2.run}, dòng tạo quần thể đầu của thuật toán gốc được bọc trong một nhánh điều kiện:
+\begin{Verbatim}
+if imp.get("init_smart", False):   # --- TV2 init_smart
+    ids = np.arange(1, inst.n + 1)
+    perms, init_sources = smart_initial_population(
+        imp, inst, n_pop, rng, lambda r: r.permutation(ids).tolist())
+    pop = [np.array(x, dtype=ids.dtype) for x in perms]
+else:
+    pop = [rng.permutation(np.arange(1, inst.n + 1)) for _ in range(n_pop)]
+\end{Verbatim}
+Hàm sinh cá thể ngẫu nhiên truyền vào chính là dòng sinh của thuật toán gốc, nên nhóm \code{random}
+trong quần thể thông minh có cùng phân phối với thuật toán gốc. Nhánh \code{else} giữ nguyên văn dòng
+cũ.
+
+\section{Điểm gắn tìm kiếm cục bộ}
+
+Đối tượng \code{LocalSearchHook} chỉ được tạo khi \code{improvements.local\_search} bật. Bộ đánh giá
+truyền cho nó là đúng bộ đánh giá NSGA-II đang dùng: \code{evaluate\_detail} khi không bật DP,
+\code{evaluate\_dp} với trọng số của con khi bật DP. Sau khi \code{make\_offspring} trả về các con (đã
+đột biến và đã có trọng số DP nếu bật), hàm \code{local\_search\_children} xử lý lần lượt từng con:
+\begin{enumerate}
+  \item gọi hook: bốc một số ngẫu nhiên, nếu nhỏ hơn $p_{ls}$ thì chạy tìm kiếm cục bộ;
+  \item con đã qua tìm kiếm cục bộ được thay bằng hoán vị kết quả, và vectơ mục tiêu lấy luôn từ kết quả
+        đánh giá chính xác mà tìm kiếm cục bộ trả về;
+  \item các con còn lại được đánh giá đúng như thuật toán gốc.
+\end{enumerate}
+
+\paragraph{Đếm số lần đánh giá.} Lần chấm nghiệm ban đầu bên trong tìm kiếm cục bộ thay cho lần chấm
+chính thức của con, nên con đó không bị chấm hai lần. Số lần đánh giá của một lần chạy là
+\begin{equation}
+  n_{\text{evals}} = N_{pop}\,(G + 1) + R - T,
+  \label{eq:nevals}
+\end{equation}
+với $R$ là tổng số lần tìm kiếm cục bộ thật sự gọi bộ đánh giá và $T$ là số lần tìm kiếm cục bộ được
+kích hoạt. Công thức này được kiểm tra trực tiếp trong test tích hợp.
+
+\section{Quy tắc số ngẫu nhiên và nhánh cờ tắt}
+
+Hai cải tiến chỉ dùng bộ sinh \code{rng} của \code{nsga2.run}. Khi cờ tắt:
+\begin{itemize}
+  \item \code{init\_smart}: không gọi mô-đun, không đọc tham số, dòng tạo quần thể giữ nguyên;
+  \item \code{local\_search}: không tạo hook, không có lần bốc $p_{ls}$ nào, các con được đánh giá bằng
+        đúng lời gọi \code{evaluate\_population} như trước.
+\end{itemize}
+Để tái dùng kết quả đánh giá của tìm kiếm cục bộ, hàm chuyển một kết quả bộ giải mã thành vectơ mục tiêu
+và mức vi phạm số xe được tách ra thành \code{objective\_row} và dùng chung cho cả \code{evaluate\_population}.
+Phép tính bên trong giữ nguyên, nên kết quả của thuật toán gốc không đổi đến từng bit (mục~\ref{sec:regress}).
+
+\section{Tương thích với các cải tiến của TV3 và TV4}
+
+\begin{itemize}
+  \item \textbf{TV3 (\code{diversity})}: tác động ở bước chọn lọc và kho lưu trữ, sau bước đánh giá con.
+        Tìm kiếm cục bộ trả về vectơ mục tiêu của con trước khi kho lưu trữ được cập nhật, nên hai cải tiến
+        không chạm vào nhau.
+  \item \textbf{TV4 (\code{dp\_split} chế độ \code{every\_eval})}: tìm kiếm cục bộ chấm bằng
+        \code{evaluate\_dp} với đúng trọng số của con, không ép bộ tuyến, không bốc lại trọng số.
+  \item \textbf{TV4 (\code{dp\_split} chế độ \code{polish})}: quá trình tiến hoá dùng cách cắt gốc, DP chỉ
+        chạy sau thế hệ cuối, nên tìm kiếm cục bộ vẫn kiểm tra lệch biên như khi không bật DP.
+  \item \textbf{TV4 (\code{adaptive\_rates})}: chỉ đổi $p_c$, $p_m$ theo từng cặp cha mẹ, không liên quan
+        tới tìm kiếm cục bộ.
+\end{itemize}
+Các tổ hợp này đều có test chạy NSGA-II thật (bảng~\ref{tab:tests}).
+
+\section{Kiểm thử}
+
+\subsection{Bộ test}
+
+Toàn bộ dự án có 432 test chạy bằng \code{pytest}, trong đó 206 test thuộc phần việc TV2.
+
+\begin{table}[H]
+\centering
+\caption{Các nhóm test của TV2}
+\label{tab:tests}
+\begin{tabularx}{\textwidth}{@{}lrX@{}}
+\toprule
+\textbf{Tệp} & \textbf{Số test} & \textbf{Nội dung kiểm tra} \\
+\midrule
+\code{test\_init\_smart.py} & 91 &
+  mọi cá thể là hoán vị đúng; chia số lượng 16/16/48 và các $N_{pop}$ lẻ; phá hoà NN và TW trên dữ liệu dựng
+  tay; sắp theo $ETa$ chứ không theo $ET$; phép hoán đổi giữ tập khách và gọi số ngẫu nhiên đúng số lần;
+  $n = 1..5$ không treo; nhãn \code{random\_fallback}; cùng seed ra cùng quần thể; không sửa đầu vào;
+  tham số sai báo lỗi; nhóm ngẫu nhiên trùng khớp dãy của thuật toán gốc \\
+\code{test\_local\_search.py} & 79 &
+  2-opt và Or-opt theo ví dụ và các biên; bước bốc luôn hợp lệ, không vô tác dụng; trội có $\varepsilon$;
+  $f_3$ đúng chiều cực đại; kết quả đúng bằng chấm lại độc lập; mỗi bước nhận đều làm giảm điểm hoặc trội;
+  mỗi ứng viên chỉ đổi đúng một tuyến và giữ tập khách; phản ví dụ lệch biên bị loại; trọng số bốc
+  đúng một lần; truyền nguyên \code{metadata}; trần ngân sách; bộ nhớ đệm; chính sách số xe; bộ đánh giá
+  kiểu DP; hook với $p_{ls} = 0$ chỉ bốc một số và không chấm thêm \\
+\code{test\_tv2\_integration.py} & 34 &
+  trên NSGA-II thật: cờ tắt không gọi code TV2; các tổ hợp \code{init\_smart}, \code{local\_search},
+  \code{diversity}, \code{dp\_split}, \code{adaptive\_rates} chạy được, tái lập theo seed, vectơ mục tiêu
+  khớp chấm lại độc lập, số lần đánh giá đúng công thức~\ref{eq:nevals}; mốc hồi quy; các hàm phụ của
+  harness \\
+\code{test\_plot\_tv2.py} & 2 & script vẽ biểu đồ chạy được và báo lỗi khi thiếu cột dữ liệu \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Kiểm tra hồi quy khi tắt cờ}
+\label{sec:regress}
+
+Điều kiện quan trọng nhất của mọi cải tiến là khi tắt hết cờ, kết quả phải giống thuật toán gốc không
+chỉ gần đúng mà trùng từng bit. Có hai mốc được kiểm tra:
+\begin{itemize}
+  \item \code{tests/fixtures/tv4\_alloff\_main.json} do TV4 sinh từ \code{nsga2.py} chưa sửa của nhánh
+        chính: hoán vị cuối, vectơ mục tiêu lưu dạng \code{float.hex}, mức vi phạm, front và số lần đánh giá
+        trên C102-25 và R201-50, seed 0 và 1. Sau khi gắn hai cải tiến của TV2, cả bốn trường hợp vẫn trùng
+        khớp hoàn toàn.
+  \item \code{tests/fixtures/tv2\_alloff\_snapshot.json}: mốc của TV2 trên ba instance, hai seed, gồm cả
+        trạng thái bộ sinh số ngẫu nhiên cuối cùng.
+\end{itemize}
+Ngoài ra có test thay các hàm của TV2 bằng hàm ném lỗi rồi chạy NSGA-II với cờ tắt; test pass chứng tỏ
+nhánh cờ tắt không chạm tới mã của TV2.
+
+\subsection{Kết quả chạy kiểm thử}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả các lệnh kiểm thử trên nhánh \code{feat/tv2-init-local-search} sau khi ghép nhánh chính}
+\label{tab:testrun}
+\begin{tabularx}{\textwidth}{@{}Xl@{}}
+\toprule
+\textbf{Lệnh} & \textbf{Kết quả} \\
+\midrule
+\code{python -m pytest} & 432 passed \\
+\code{python -m scripts.tv2\_regression\_snapshot --check} & REGRESSION PASS \\
+\code{python -m scripts.tv2\_dp\_compat\_check} & DP+LS compatibility: PASS \\
+\code{python -m scripts.smoke\_phase0} & chạy thành công \\
+\code{python -m pip check} & No broken requirements found \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Script \code{tv2\_dp\_compat\_check} chạy tìm kiếm cục bộ với bộ đánh giá DP của TV4 trên C102-25,
+R201-50, RC201-100, mỗi instance 20 lần gọi với $p_{ls} = 1$. Ở mọi lần gọi, bộ đánh giá nhận đúng một
+đối tượng trọng số, kết quả trả về trùng với chấm lại bằng \code{evaluate\_dp}, và không lần nào biến
+nghiệm hợp lệ về số xe thành không hợp lệ. Thời gian trung bình mỗi lần gọi là 21 ms (25 khách),
+54 ms (50 khách) và 124 ms (100 khách).

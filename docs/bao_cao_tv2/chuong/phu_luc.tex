@@ -1,0 +1,79 @@
+\chapter{CÁC TỆP CỦA PHẦN VIỆC TV2}
+
+\begin{table}[H]
+\centering
+\caption{Các tệp do TV2 viết hoặc sửa trên nhánh \code{feat/tv2-init-local-search}}
+\label{tab:files}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{8cm}X@{}}
+\toprule
+\textbf{Tệp} & \textbf{Nội dung} \\
+\midrule
+\code{src/improvements/init\_smart.py} & khởi tạo quần thể thông minh \\
+\code{src/improvements/local\_search.py} & 2-opt, Or-opt, tiêu chí chấp nhận, tìm kiếm cục bộ, bộ đếm \\
+\code{src/improvements/tv2\_hooks.py} & lớp dán giữa NSGA-II và hai mô-đun, hệ số chuẩn hoá \\
+\code{src/nsga2.py} & hai điểm gắn có điều kiện, \code{objective\_row}, \code{local\_search\_children} \\
+\code{config.yaml} & khối \code{init\_smart\_params} và \code{local\_search\_params} \\
+\code{tests/test\_init\_smart.py} & 91 test của khởi tạo thông minh \\
+\code{tests/test\_local\_search.py} & 79 test của tìm kiếm cục bộ \\
+\code{tests/test\_tv2\_integration.py} & 34 test tích hợp và hồi quy \\
+\code{tests/test\_plot\_tv2.py} & 2 test của script vẽ biểu đồ \\
+\code{tests/fixtures/tv2\_alloff\_snapshot.json} & mốc hồi quy khi tắt cờ \\
+\code{scripts/tv2\_regression\_snapshot.py} & chụp và kiểm tra mốc hồi quy \\
+\code{scripts/tv2\_dp\_compat\_check.py} & kiểm tra tìm kiếm cục bộ chạy cùng DP split \\
+\code{scripts/tv2\_report\_figures.py} & sinh bảng số liệu và hình cho báo cáo này \\
+\code{scripts/tv2\_harness.py}, \code{scripts/run\_tv2\_experiments.py}, \code{scripts/plot\_tv2\_results.py} &
+  harness NSGA-II tạm và thí nghiệm sơ bộ trước khi có \code{nsga2.py} của TV1 \\
+\code{docs/tv2\_integration.md}, \code{docs/tv2\_merge\_playbook.md}, \code{docs/tv2\_report.md} &
+  hợp đồng giao diện, quy trình ghép nhánh, báo cáo sơ bộ \\
+\code{docs/bao\_cao\_tv2/} & mã nguồn LaTeX của báo cáo này \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\chapter{CÁCH TÁI LẬP KẾT QUẢ}
+
+Các lệnh chạy trong PowerShell, tại thư mục gốc của repository, với Python 3.11 và các thư viện đúng
+phiên bản ghim trong \code{requirements.txt}.
+
+\paragraph{Cài đặt và kiểm thử.}
+\begin{Verbatim}
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python -m pytest
+python -m scripts.tv2_regression_snapshot --check
+\end{Verbatim}
+
+\paragraph{Chạy một cấu hình.} Ví dụ cấu hình bật cả hai cải tiến trên C102-25, seed 0 đến 9:
+\begin{Verbatim}
+python -m src.runner run --exp tv2_main --config both --instance C102 --n 25 `
+  --set improvements.init_smart=true --set improvements.local_search=true
+\end{Verbatim}
+Các cấu hình khác chỉ khác nhau ở các tuỳ chọn \code{--set}:
+\begin{Verbatim}
+off         (không có --set)
+init_only   --set improvements.init_smart=true
+ls_only     --set improvements.local_search=true
+ls_drift    --set improvements.local_search=true
+            --set improvements.local_search_params.
+                  split_drift_policy=evaluate_actual   (viết liền một dòng)
+both_drift  init_only + ls_drift
+off_long    --set nsga2.n_gen=<số thế hệ cho cùng số lần đánh giá>
+\end{Verbatim}
+Thí nghiệm tinh chỉnh dùng \code{--exp tv2\_tune --seeds 100,101,102,103,104}.
+
+\paragraph{Tính chỉ số và vẽ hình.}
+\begin{Verbatim}
+python -m src.runner analyze --exp tv2_main --instance C102-25
+python -m scripts.tv2_report_figures
+\end{Verbatim}
+Lệnh cuối đọc kết quả trong \code{results/}, ghi các bảng vào \code{docs/bao\_cao\_tv2/so\_lieu/} và các
+hình vào \code{docs/bao\_cao\_tv2/hinh/}.
+
+\paragraph{Biên dịch báo cáo.}
+\begin{Verbatim}
+cd docs/bao_cao_tv2
+xelatex bao_cao_tv2.tex
+xelatex bao_cao_tv2.tex
+\end{Verbatim}

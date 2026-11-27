@@ -1,0 +1,261 @@
+\chapter{KHỞI TẠO QUẦN THỂ THÔNG MINH}
+\label{chap:init}
+
+\section{Mục tiêu và yêu cầu}
+
+Thuật toán gốc tạo $N_{pop}$ hoán vị ngẫu nhiên. Với cách cắt tuyến \code{capacity\_time}, một hoán vị
+ngẫu nhiên thường đi vòng xa và mở nhiều xe, nên quần thể ban đầu nằm rất xa vùng tốt. Cải tiến
+\code{init\_smart} thay bước này bằng ba nguồn cá thể:
+\begin{itemize}
+  \item một phần quần thể dựng từ thứ tự láng giềng gần nhất (nhãn \code{nn});
+  \item một phần dựng từ thứ tự theo khung giờ (nhãn \code{tw});
+  \item phần còn lại sinh ngẫu nhiên đúng như thuật toán gốc (nhãn \code{random}).
+\end{itemize}
+Các yêu cầu cụ thể của cải tiến:
+\begin{enumerate}
+  \item mọi cá thể là hoán vị hợp lệ của $1,\dots,n$, không thiếu, không trùng khách, không chứa kho;
+  \item số cá thể của từng nguồn đúng theo tỉ lệ trong cấu hình, kể cả khi $N_{pop}$ không chia hết;
+  \item hai thứ tự NN và TW là tất định, nên cần tạo biến thể để quần thể không chứa nhiều bản giống hệt
+        nhau;
+  \item chỉ dùng bộ sinh số ngẫu nhiên được truyền vào, cùng seed thì ra cùng quần thể;
+  \item khi cờ tắt, \code{nsga2.py} không gọi đến mô-đun này.
+\end{enumerate}
+
+Tham số trong \code{config.yaml}:
+\begin{Verbatim}
+improvements:
+  init_smart: false
+  init_smart_params:
+    ratios: {nn: 0.2, tw: 0.2, random: 0.6}
+    perturb_swaps_min: 1
+    perturb_swaps_max: 3
+    keep_pure_seed: true
+    dedup_max_attempts: 50
+\end{Verbatim}
+
+\section{Chia số lượng cá thể theo tỉ lệ}
+\label{sec:quota}
+
+Với $N_{pop} = 80$ và tỉ lệ $0{,}2/0{,}2/0{,}6$, số lượng là $16/16/48$. Khi $N_{pop}$ không chia hết,
+làm tròn từng nguồn riêng lẻ có thể ra tổng khác $N_{pop}$. Mô-đun dùng phương pháp phần dư lớn nhất:
+\begin{enumerate}
+  \item với mỗi nguồn $k$, lấy phần nguyên $\lfloor N_{pop}\, r_k \rfloor$;
+  \item số chỗ còn thiếu bằng $N_{pop}$ trừ tổng các phần nguyên;
+  \item phát lần lượt từng chỗ còn thiếu cho nguồn có phần dư $N_{pop} r_k - \lfloor N_{pop} r_k
+        \rfloor$ lớn nhất; khi hai phần dư bằng nhau thì ưu tiên theo thứ tự \code{nn}, \code{tw},
+        \code{random}.
+\end{enumerate}
+Tổng luôn đúng bằng $N_{pop}$ và mỗi nguồn lệch tỉ lệ lý tưởng không quá một cá thể.
+
+\begin{table}[H]
+\centering
+\caption{Ví dụ chia số lượng với tỉ lệ $0{,}2/0{,}2/0{,}6$}
+\label{tab:quota}
+\begin{tabular}{@{}rccccc@{}}
+\toprule
+$N_{pop}$ & $N_{pop}\cdot r$ & Phần nguyên & Phần dư & Chỗ thiếu & Kết quả \\
+\midrule
+80 & 16 / 16 / 48 & 16 / 16 / 48 & 0 / 0 / 0 & 0 & 16 / 16 / 48 \\
+25 & 5 / 5 / 15 & 5 / 5 / 15 & 0 / 0 / 0 & 0 & 5 / 5 / 15 \\
+7 & 1,4 / 1,4 / 4,2 & 1 / 1 / 4 & 0,4 / 0,4 / 0,2 & 1 & 2 / 1 / 4 \\
+3 & 0,6 / 0,6 / 1,8 & 0 / 0 / 1 & 0,6 / 0,6 / 0,8 & 2 & 1 / 0 / 2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ở dòng $N_{pop} = 7$, \code{nn} và \code{tw} cùng phần dư $0{,}4$; quy tắc phá hoà cho chỗ thừa vào
+\code{nn}. Ở dòng $N_{pop} = 3$, hai chỗ thừa vào \code{random} (dư $0{,}8$) rồi \code{nn} (dư $0{,}6$,
+thắng \code{tw} khi hoà).
+
+Tham số tỉ lệ được kiểm tra trước khi dùng: đủ ba khoá, mỗi giá trị là số hữu hạn không âm, tổng bằng 1
+với sai số $10^{-6}$. Cấu hình sai báo lỗi \code{ValueError} kèm lý do, không âm thầm sửa.
+
+\section{Hai thứ tự gốc tất định}
+
+\subsection{Thứ tự láng giềng gần nhất}
+
+Bắt đầu tại kho (điểm 0). Ở mỗi bước, trong các khách chưa ghé, chọn khách $c$ có $d_{\text{hiện tại},c}$
+nhỏ nhất; nếu bằng nhau thì chọn khách có số hiệu nhỏ hơn. Khung thời gian không được xét ở bước này;
+việc cắt tuyến và tính giờ đến do bộ giải mã đảm nhiệm.
+
+\subsection{Thứ tự theo khung giờ}
+
+Chọn lần lượt khách chưa ghé có $ETa$ nhỏ nhất. Nếu nhiều khách cùng $ETa$, chọn khách gần điểm vừa chọn
+nhất (với khách đầu tiên là gần kho nhất); nếu vẫn bằng nhau thì chọn số hiệu nhỏ hơn. Mốc sắp xếp là
+$ETa$ (đầu khung kỳ vọng), không phải $ET$ (đầu khung chấp nhận được): $ET$ bị nới thêm 30 phút và kẹp
+về 0, nên nhiều khách có cùng $ET = 0$ dù khung kỳ vọng khác nhau.
+
+\subsection{Ví dụ trên 8 khách đầu của C102}
+
+Bảng~\ref{tab:c102-8} là dữ liệu thật của 8 khách đầu tiên trong C102.
+
+\begin{table}[H]
+\centering
+\caption{Dữ liệu 8 khách đầu của instance C102}
+\label{tab:c102-8}
+\begin{tabular}{@{}crrrrr@{}}
+\toprule
+Khách & $x$ & $y$ & Nhu cầu (kg) & $[ETa, LTb]$ (phút) & $d_{0,i}$ (km) \\
+\midrule
+0 (kho) & 40 & 50 & 0 & [0, 1236] & 0 \\
+1 & 45 & 68 & 10 & [0, 1127] & 18,68 \\
+2 & 45 & 70 & 30 & [0, 1125] & 20,62 \\
+3 & 42 & 66 & 10 & [0, 1129] & 16,12 \\
+4 & 42 & 68 & 10 & [727, 782] & 18,11 \\
+5 & 42 & 65 & 10 & [0, 1130] & 15,13 \\
+6 & 40 & 69 & 20 & [621, 702] & 19,00 \\
+7 & 40 & 66 & 20 & [0, 1130] & 16,00 \\
+8 & 38 & 68 & 20 & [255, 324] & 18,11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Thứ tự NN.} Từ kho, khách 5 gần nhất (15,13 km). Từ khách 5, khách 3 cách 1 km. Từ khách 3,
+khách 4 và khách 7 cùng cách 2 km, quy tắc phá hoà chọn khách 4. Tiếp theo là 6, 8, 7, 1, 2. Kết quả
+$\pi_{NN} = (5, 3, 4, 6, 8, 7, 1, 2)$.
+
+\paragraph{Thứ tự TW.} Năm khách 1, 2, 3, 5, 7 cùng $ETa = 0$. Trong nhóm này, khách 5 gần kho nhất, sau
+đó lần lượt chọn khách gần điểm vừa chọn: 3, 7, 1, 2. Tiếp theo là khách 8 ($ETa = 255$), khách 6
+($ETa = 621$), khách 4 ($ETa = 727$). Kết quả $\pi_{TW} = (5, 3, 7, 1, 2, 8, 6, 4)$.
+
+Hình~\ref{fig:nn-tw} vẽ hai thứ tự này. Thứ tự NN đi vòng gọn trong cụm khách, còn thứ tự TW quay lại
+các khách 8, 6, 4 ở cuối vì khung giờ của chúng mở muộn.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1, horizontal sep=1.6cm},
+  width=6.6cm, height=6.6cm, xmin=36.5, xmax=46.5, ymin=63.5, ymax=71.5,
+  xlabel={$x$}, ylabel={$y$}, tick label style={font=\footnotesize},
+  title style={font=\small}]
+\nextgroupplot[title={Láng giềng gần nhất}]
+\addplot[-{Stealth[length=2mm]}, thick, blue1] coordinates
+  {(42,65) (42,66) (42,68) (40,69) (38,68) (40,66) (45,68) (45,70)};
+\addplot[only marks, mark=*, mark size=2.2pt, black] coordinates
+  {(45,68) (45,70) (42,66) (42,68) (42,65) (40,69) (40,66) (38,68)};
+\node[font=\scriptsize, anchor=west] at (axis cs:45.2,68) {1};
+\node[font=\scriptsize, anchor=west] at (axis cs:45.2,70) {2};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,66) {3};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,68.2) {4};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,64.8) {5};
+\node[font=\scriptsize, anchor=south] at (axis cs:40,69.2) {6};
+\node[font=\scriptsize, anchor=north] at (axis cs:40,65.8) {7};
+\node[font=\scriptsize, anchor=east] at (axis cs:37.8,68) {8};
+\nextgroupplot[title={Theo khung giờ $ETa$}]
+\addplot[-{Stealth[length=2mm]}, thick, orange1] coordinates
+  {(42,65) (42,66) (40,66) (45,68) (45,70) (38,68) (40,69) (42,68)};
+\addplot[only marks, mark=*, mark size=2.2pt, black] coordinates
+  {(45,68) (45,70) (42,66) (42,68) (42,65) (40,69) (40,66) (38,68)};
+\node[font=\scriptsize, anchor=west] at (axis cs:45.2,68) {1};
+\node[font=\scriptsize, anchor=west] at (axis cs:45.2,70) {2};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,66) {3};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,68.2) {4};
+\node[font=\scriptsize, anchor=west] at (axis cs:42.2,64.8) {5};
+\node[font=\scriptsize, anchor=south] at (axis cs:40,69.2) {6};
+\node[font=\scriptsize, anchor=north] at (axis cs:40,65.8) {7};
+\node[font=\scriptsize, anchor=east] at (axis cs:37.8,68) {8};
+\end{groupplot}
+\end{tikzpicture}
+\caption{Thứ tự ghé của hai heuristic trên 8 khách đầu của C102 (kho ở toạ độ $(40, 50)$, nằm ngoài khung
+hình, cả hai thứ tự đều bắt đầu từ khách 5)}
+\label{fig:nn-tw}
+\end{figure}
+
+Để thấy hai thứ tự gốc khác hoán vị ngẫu nhiên thế nào, bảng~\ref{tab:base-obj} chấm ba hoán vị đầy đủ
+của C102-25 bằng bộ giải mã của nhóm.
+
+\begin{table}[H]
+\centering
+\caption{Mục tiêu của ba hoán vị trên C102-25 (hoán vị ngẫu nhiên lấy với seed 0)}
+\label{tab:base-obj}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Hoán vị & $f_1$ (CNY) & $f_2$ (kg) & $f_3$ & Số xe \\
+\midrule
+Ngẫu nhiên & 4817,5 & 485,2 & 0,4000 & 11 \\
+Láng giềng gần nhất & \textbf{2564,4} & \textbf{224,2} & \textbf{0,7034} & 7 \\
+Theo khung giờ & 4170,1 & 469,5 & 0,6726 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Thứ tự NN cho chi phí và khí thải chỉ bằng khoảng một nửa hoán vị ngẫu nhiên, thứ tự TW cho mức hài lòng
+cao gần bằng NN. Đây là lý do dùng cả hai: mỗi thứ tự gieo một điểm xuất phát tốt ở một vùng khác của
+mặt Pareto.
+
+\section{Tạo biến thể bằng hoán đổi}
+
+Hai thứ tự gốc luôn cho cùng một hoán vị, nên nếu sao chép 16 lần thì quần thể có 16 cá thể giống hệt
+nhau. Mô-đun giữ một bản gốc (khi \code{keep\_pure\_seed} bật) và tạo các bản còn lại bằng $k$ lần hoán
+đổi hai vị trí khác nhau, với $k$ bốc đều trong $[\code{perturb\_swaps\_min},
+\code{perturb\_swaps\_max}] = [1, 3]$. Phép hoán đổi giữ nguyên tập khách nên kết quả vẫn là hoán vị hợp
+lệ. Ba biến thể đầu tiên của $\pi_{NN}$ trên C102-8 với seed 0 là:
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+Gốc & $(5, 3, 4, 6, 8, 7, 1, 2)$ \\
+Biến thể 1 & $(3, 4, 5, 6, 2, 7, 1, 8)$ \\
+Biến thể 2 & $(5, 3, 4, 6, 1, 8, 7, 2)$ \\
+Biến thể 3 & $(5, 3, 4, 2, 8, 6, 1, 7)$ \\
+\end{tabular}
+\end{center}
+Số lần hoán đổi nhỏ giữ lại phần lớn cấu trúc tốt của thứ tự gốc mà vẫn tạo được khác biệt.
+
+\section{Khử trùng và trường hợp đặc biệt}
+
+Mỗi cá thể mới được so với tập các hoán vị đã có (lưu dưới dạng bộ giá trị để tra cứu trong $O(1)$). Nếu
+trùng, mô-đun sinh lại, tối đa \code{dedup\_max\_attempts} lần. Hết số lần thử mà vẫn trùng thì chỗ đó
+được thay bằng một hoán vị ngẫu nhiên, gắn nhãn riêng \code{random\_fallback} và được đếm trong
+\code{effective\_counts}. Như vậy báo cáo luôn biết chính xác quần thể thực có bao nhiêu cá thể mỗi loại,
+thay vì giả định tỉ lệ đã đạt.
+
+Với $n$ rất nhỏ, số hoán vị khác nhau là $n!$ có thể nhỏ hơn $N_{pop}$ (ví dụ $n = 4$ chỉ có 24 hoán
+vị). Khi đó không thể có quần thể toàn cá thể khác nhau. Mô-đun vẫn khử trùng cho tới khi đã dùng hết
+các hoán vị khả dĩ, sau đó chấp nhận trùng, ghi số cá thể trùng vào \code{n\_duplicates} và một dòng
+ghi chú. Hàm không bao giờ lặp vô hạn. Với $n = 1$, phép hoán đổi không thực hiện được và mô-đun trả bản
+sao mà không bốc số ngẫu nhiên.
+
+\section{Thuật toán và quy tắc dùng số ngẫu nhiên}
+
+\begin{algorithm}[H]
+\caption{Khởi tạo quần thể thông minh}
+\label{alg:init}
+\KwIn{instance, $N_{pop}$, bộ sinh \textit{rng}, tham số, hàm sinh cá thể ngẫu nhiên của thuật toán gốc \textit{base}}
+\KwOut{danh sách $N_{pop}$ hoán vị và nhãn nguồn}
+$(q_{nn}, q_{tw}, q_{rd}) \gets$ \textsc{ChiaSoLuong}($N_{pop}$, tỉ lệ)\;
+$P \gets \emptyset$; $\textit{seen} \gets \emptyset$\;
+\ForEach{$(\textit{nhãn}, \pi_0) \in \{(\texttt{nn}, \pi_{NN}), (\texttt{tw}, \pi_{TW})\}$}{
+  \For{$j \gets 1$ \KwTo $q_{\textit{nhãn}}$}{
+    \eIf{$j = 1$ \textbf{and} giữ bản gốc \textbf{and} $\pi_0 \notin \textit{seen}$}{thêm $\pi_0$ với nhãn \textit{nhãn}\;}{
+      thử tối đa $A$ lần: $\pi \gets$ \textsc{HoanDoi}($\pi_0$, \textit{rng}); nếu $\pi \notin \textit{seen}$ thì thêm $\pi$ và dừng\;
+      nếu hết $A$ lần: thêm \textit{base}(\textit{rng}) với nhãn \texttt{random\_fallback}\;
+    }
+  }
+}
+\For{$j \gets 1$ \KwTo $q_{rd}$}{
+  $\pi \gets$ \textit{base}(\textit{rng}); sinh lại tối đa $A$ lần nếu trùng; thêm $\pi$ với nhãn \texttt{random}\;
+}
+\Return{$P$}
+\end{algorithm}
+
+Thứ tự gọi bộ sinh ngẫu nhiên được cố định: toàn bộ nhóm \code{nn}, rồi nhóm \code{tw}, rồi nhóm
+\code{random}; quần thể không bị xáo lại ở cuối. Bản gốc của mỗi nhóm không tiêu thụ số ngẫu nhiên nào.
+Mỗi biến thể tiêu thụ đúng một lần \code{rng.integers} (chọn $k$) và $k$ lần \code{rng.choice} (chọn hai
+vị trí). Nhóm \code{random} gọi đúng hàm sinh cá thể của thuật toán gốc,
+\code{rng.permutation(np.arange(1, n+1))}. Hệ quả kiểm chứng được bằng test: nếu đặt tỉ lệ
+\code{random} = 1, quần thể và trạng thái bộ sinh sau khởi tạo trùng khớp với thuật toán gốc.
+
+\paragraph{Độ phức tạp.} Dựng $\pi_{NN}$ và $\pi_{TW}$ tốn $O(n^2)$, chỉ một lần mỗi lần chạy. Mỗi cá
+thể còn lại tốn $O(n)$ để sinh và $O(n)$ để băm khi khử trùng, nhân với số lần thử. Tổng cộng
+$O(n^2 + N_{pop}\, n\, A)$ với $A$ là số lần thử tối đa, không đáng kể so với một thế hệ NSGA-II.
+
+\section{Giao diện lập trình}
+
+Mô-đun nằm ở \code{src/improvements/init\_smart.py}:
+\begin{Verbatim}
+make_initial_population(inst, n_pop, rng, params, baseline_factory=None)
+    -> (list[list[int]], list[str])     # hoán vị và nhãn nguồn
+make_initial_population_detailed(...)  -> InitResult
+    # thêm quota, effective_counts, n_duplicates, n_dedup_retries, notes
+\end{Verbatim}
+\code{nsga2.py} gọi qua lớp dán mỏng \code{smart\_initial\_population} trong
+\code{src/improvements/tv2\_hooks.py}, chỉ khi \code{improvements.init\_smart} bật.

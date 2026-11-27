@@ -1,0 +1,38 @@
+\begin{titlepage}
+\newgeometry{left=2.5cm,right=2.5cm,top=2cm,bottom=2cm}
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[line width=2.5pt,color=hustred]
+    ($(current page.north west)+(1.5cm,-1.5cm)$) rectangle ($(current page.south east)+(-1.5cm,1.5cm)$);
+  \draw[line width=0.6pt,color=hustred]
+    ($(current page.north west)+(1.7cm,-1.7cm)$) rectangle ($(current page.south east)+(-1.7cm,1.7cm)$);
+\end{tikzpicture}
+\centering
+\setstretch{1.2}
+{\fontsize{15}{18}\selectfont\bfseries ĐẠI HỌC BÁCH KHOA HÀ NỘI\par}
+{\fontsize{13}{16}\selectfont\bfseries \TenTruong\par}
+\vspace{0.3cm}
+\rule{0.4\textwidth}{0.6pt}\par
+\vspace{0.9cm}
+\includegraphics[height=4.2cm]{logo_hust.png}\par
+\vspace{1.1cm}
+{\fontsize{20}{24}\selectfont\bfseries BÁO CÁO BÀI TẬP LỚN\par}
+\vspace{0.3cm}
+{\fontsize{14}{17}\selectfont\bfseries HỌC PHẦN: \HocPhan\par}
+\vspace{1cm}
+{\fontsize{16}{21}\selectfont\bfseries\color{hustred}
+ THUẬT TOÁN NSGA-II CHO BÀI TOÁN\\ ĐỊNH TUYẾN XE XANH ĐA MỤC TIÊU\\ CÓ KHUNG THỜI GIAN (MOGVRPTW)\par}
+\vspace{0.6cm}
+{\fontsize{14}{18}\selectfont\bfseries Phần việc TV2: Khởi tạo quần thể thông minh\\
+ và tìm kiếm cục bộ trong tuyến\par}
+\vfill
+\begin{tabular}{@{}l@{\hspace{0.6cm}}l@{}}
+  \textbf{Sinh viên thực hiện:} & \TenSV \\
+  \textbf{Mã số sinh viên:}     & \MSSV \\
+  \textbf{Lớp:}                 & \Lop \\
+  \textbf{Nhóm:}                & \Nhom \\
+  \textbf{Giảng viên hướng dẫn:} & \GVHD \\
+\end{tabular}
+\vfill
+{\fontsize{13}{16}\selectfont\bfseries HÀ NỘI, THÁNG 11/2026\par}
+\restoregeometry
+\end{titlepage}

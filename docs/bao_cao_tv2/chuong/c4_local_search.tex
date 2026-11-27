@@ -1,0 +1,282 @@
+\chapter{TÌM KIẾM CỤC BỘ TRONG TUYẾN}
+\label{chap:ls}
+
+\section{Mục tiêu và vị trí trong vòng lặp}
+
+Cải tiến \code{local\_search} tinh chỉnh từng con vừa sinh ra bằng các thay đổi nhỏ trong từng tuyến.
+Nó chạy \emph{sau đột biến} và \emph{trước lần đánh giá chính thức} của con. Không phải con nào cũng
+được tinh chỉnh: với mỗi con, bộ sinh ngẫu nhiên của NSGA-II bốc một số trong $[0,1)$, nhỏ hơn $p_{ls}$
+thì chạy tìm kiếm cục bộ, ngược lại con giữ nguyên và được đánh giá như thuật toán gốc.
+
+Tham số trong \code{config.yaml}:
+\begin{Verbatim}
+improvements:
+  local_search: false
+  local_search_params:
+    p_ls: 0.2                 # xác suất chạy LS cho mỗi con
+    max_passes: 2             # số lượt duyệt các tuyến tối đa mỗi lần gọi
+    max_candidate_evals: 40   # trần cứng số ứng viên được chấm mỗi lần gọi
+    max_accepted_moves: 5     # số bước được nhận tối đa mỗi lần gọi
+    operators: [two_opt, or_opt]
+    or_opt_lengths: [1, 2, 3]
+    strategy: first           # first | best
+    acceptance: weighted      # weighted | pareto
+    weight_distribution: dirichlet   # dirichlet | equal
+    improvement_epsilon: 1.0e-10
+    split_drift_policy: reject       # reject | evaluate_actual
+\end{Verbatim}
+
+\section{Hai toán tử trong tuyến}
+
+\subsection{2-opt}
+
+\code{two\_opt(route, i, j)} với $0 \le i < j < |\text{route}|$ trả về bản sao của tuyến với đoạn từ vị
+trí $i$ đến $j$ (gồm cả hai đầu) bị đảo ngược. Tuyến đầu vào không bị sửa.
+
+\subsection{Or-opt}
+
+\code{or\_opt(route, start, L, insert\_at)} cắt khối $L$ khách liên tiếp bắt đầu tại \code{start}, giữ
+nguyên thứ tự trong khối, rồi chèn khối vào vị trí \code{insert\_at}. Vị trí chèn được tính trên mảng
+\emph{đã bỏ khối}, nên luôn nằm trong $[0, |\text{route}| - L]$. Khi $\code{insert\_at} = \code{start}$,
+kết quả trùng tuyến cũ (không đổi gì). Ví dụ trong đặc tả: tuyến $(1,2,3,4,5,6)$, khối $(2,3)$ có
+$\code{start}=1$, $L=2$; bỏ khối còn $(1,4,5,6)$; chèn tại vị trí 3 được $(1,4,5,2,3,6)$, tức khối được
+chuyển ra sau khách 5.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, minimum width=0.9cm, minimum height=0.75cm, font=\small},
+  hi/.style={box, fill=blue1!20},
+  ho/.style={box, fill=orange1!25}]
+  % 2-opt
+  \node[anchor=east, font=\small\bfseries] at (-0.3,0) {2-opt};
+  \foreach \v/\s [count=\k from 0] in {3/box,7/hi,1/hi,9/hi,4/hi,6/box}
+    \node[\s] (a\k) at (\k*0.9,0) {\v};
+  \node[font=\footnotesize] at (2.25,0.75) {đảo đoạn $i=1$ đến $j=4$};
+  \draw[-{Stealth}, thick] (5.4,0) -- (6.4,0);
+  \foreach \v/\s [count=\k from 0] in {3/box,4/hi,9/hi,1/hi,7/hi,6/box}
+    \node[\s] at (7+\k*0.9,0) {\v};
+  % or-opt
+  \node[anchor=east, font=\small\bfseries] at (-0.3,-1.8) {Or-opt};
+  \foreach \v/\s [count=\k from 0] in {3/box,7/ho,1/ho,9/box,4/box,6/box}
+    \node[\s] at (\k*0.9,-1.8) {\v};
+  \node[font=\footnotesize] at (2.25,-1.05) {khối $(7,1)$: \code{start}=1, $L$=2};
+  \draw[-{Stealth}, thick] (5.4,-1.8) -- (6.4,-1.8);
+  \foreach \v/\s [count=\k from 0] in {3/box,9/box,4/box,7/ho,1/ho,6/box}
+    \node[\s] at (7+\k*0.9,-1.8) {\v};
+  \node[font=\footnotesize] at (9.7,-1.05) {chèn tại vị trí 3 của $(3,9,4,6)$};
+\end{tikzpicture}
+\caption{Hai toán tử trong tuyến trên tuyến $(3,7,1,9,4,6)$}
+\label{fig:ops}
+\end{figure}
+
+\subsection{Cách bốc bước đi}
+
+Mỗi bước đi được bốc ngẫu nhiên, không duyệt hết mọi cặp vị trí (duyệt hết có $O(m^2)$ bước 2-opt và
+$O(m^2)$ bước Or-opt trên một tuyến dài $m$, nhân với số tuyến và số lần lặp sẽ quá đắt). Với tuyến dài
+$m \ge 2$:
+\begin{itemize}
+  \item 2-opt: bốc $i$ đều trong $[0, m-2]$, rồi $j$ đều trong $[i+1, m-1]$;
+  \item Or-opt: bốc $L$ trong các độ dài cho phép nhỏ hơn $m$, bốc \code{start} trong $[0, m-L]$, bốc
+        vị trí chèn trong $m - L$ vị trí khác \code{start}. Cách bốc này loại sẵn trường hợp không đổi gì.
+\end{itemize}
+Tuyến chỉ có một khách không có bước đi nào và được bỏ qua.
+
+\section{Quy trình một lần tìm kiếm cục bộ}
+
+\begin{algorithm}[H]
+\caption{Một lần tìm kiếm cục bộ trên hoán vị con $\pi$}
+\label{alg:ls}
+\KwIn{$\pi$, bộ sinh \textit{rng}, tham số, \textit{eval} (đúng bộ đánh giá NSGA-II dùng), \textit{meta}}
+\KwOut{hoán vị $\pi^*$ và kết quả đánh giá chính xác của nó}
+\If{tiêu chí là \texttt{weighted}}{$\mathbf{w} \gets$ \textit{rng}.dirichlet$(1,1,1)$ \tcp*{một lần cho cả lần gọi}}
+$D \gets \textit{eval}(\pi, \textit{meta})$; $\pi^* \gets \pi$\;
+\For{lượt $\gets 1$ \KwTo \texttt{max\_passes}}{
+  $R \gets D$.routes; $E \gets$ các tuyến có ít nhất 2 khách; \lIf{$E = \emptyset$}{\textbf{dừng}}
+  \ForEach{tuyến $r$ theo thứ tự \textit{rng}.permutation($E$)}{
+    \ForEach{toán tử $o \in$ \texttt{operators}}{
+      \lIf{hết ngân sách ứng viên hoặc đủ số bước được nhận}{\Return{$\pi^*, D$}}
+      $r' \gets$ bốc một bước $o$ trên $R[r]$; $R' \gets R$ với $R[r]$ thay bằng $r'$\;
+      $\pi' \gets$ nối các tuyến của $R'$; $D' \gets \textit{eval}(\pi', \textit{meta})$\;
+      \If{$D'$.routes $\ne R'$ \textbf{and} chính sách là \texttt{reject}}{loại (lệch biên tuyến); \textbf{tiếp}}
+      \lIf{$D'$ làm xấu ràng buộc số xe so với $D$}{loại; \textbf{tiếp}}
+      \If{$D'$ tốt hơn $D$ theo tiêu chí}{
+        $\pi^* \gets \pi'$; $D \gets D'$; cập nhật $R$\;
+        \textbf{sang tuyến kế tiếp} \tcp*{first improvement}
+      }
+    }
+  }
+}
+\Return{$\pi^*, D$}
+\end{algorithm}
+
+Ba điểm thiết kế quan trọng:
+\begin{enumerate}
+  \item \textbf{Bước đi luôn được đề xuất trên bộ tuyến của nghiệm hiện tại}, lấy từ kết quả bộ giải mã,
+        không tự cắt lại. Mỗi bước chỉ đổi thứ tự trong \emph{một} tuyến, tập khách của tuyến đó giữ nguyên.
+  \item \textbf{Mọi ứng viên được chấm lại bằng chính bộ đánh giá NSGA-II dùng}, trên toàn bộ hoán vị.
+        Mô-đun không tự tính điểm riêng cho một tuyến rồi coi đó là độ thích nghi của cả cá thể.
+  \item \textbf{Kết quả trả về là kết quả đánh giá thật} của hoán vị cuối. NSGA-II dùng lại kết quả này,
+        không phải chấm lần nữa.
+\end{enumerate}
+Với chiến lược \code{best}, mô-đun chấm cả hai toán tử trên một tuyến rồi lấy bước tốt nhất trong các
+bước được nhận, thay vì lấy bước đầu tiên.
+
+\section{Tiêu chí chấp nhận}
+
+\subsection{Theo trội Pareto}
+
+Nhận bước đi khi $\mathbf{g}(\pi') \prec_\varepsilon \mathbf{g}(\pi^*)$ theo công thức~\ref{eq:dom-eps},
+với $\varepsilon = 10^{-10}$. Mọi bước được nhận đều là cải thiện thật trên cả ba mục tiêu.
+
+\subsection{Theo tổng có trọng số (mặc định)}
+
+Nhận khi $S(\mathbf{g}(\pi')) < S(\mathbf{g}(\pi^*)) - \varepsilon$ với $S$ ở công thức~\ref{eq:score}.
+Hai lựa chọn quyết định tính đúng đắn của tiêu chí này.
+
+\paragraph{Trọng số bốc một lần cho mỗi lần gọi.} Vectơ $\mathbf{w}$ được bốc từ phân phối Dirichlet
+$(1,1,1)$, tức phân bố đều trên tam giác $w_1 + w_2 + w_3 = 1$, đúng một lần ở đầu lần gọi, rồi dùng
+chung cho nghiệm ban đầu và mọi ứng viên. Nếu bốc lại trọng số cho từng bước, hai bước liên tiếp có thể
+được so bằng hai thước đo khác nhau và quá trình không còn đơn điệu theo bất kỳ thước đo nào. Tuỳ chọn
+\code{equal} dùng $\mathbf{w} = (1/3, 1/3, 1/3)$ và không bốc số ngẫu nhiên.
+
+\paragraph{Hệ số chuẩn hoá cố định.} Vectơ $\mathbf{s}$ được tính một lần mỗi lần chạy NSGA-II:
+$s_1, s_2$ là trung bình $f_1$, $f_2$ của ba hoán vị tất định (thứ tự số hiệu, $\pi_{NN}$, $\pi_{TW}$)
+chấm bằng bộ giải mã gốc; $s_3 = 1$ vì $1 - f_3$ đã nằm trong $[0,1]$. Với C102-25,
+$\mathbf{s} = (3606{,}42;\ 350{,}56;\ 1)$. Hệ số này không phụ thuộc ứng viên đang xét. Chuẩn hoá theo
+giá trị nhỏ nhất và lớn nhất của chính hai lời giải đang so sẽ làm thước đo thay đổi theo từng cặp,
+nên không được dùng.
+
+Một bước được nhận theo tiêu chí này có thể làm xấu một mục tiêu riêng lẻ, miễn tổng có trọng số giảm.
+Vì vậy mọi bước được nhận được ghi lại kèm vectơ mục tiêu trước và sau, cùng tên tiêu chí đã dùng
+(\code{accepted\_by}), để có thể kiểm tra lại.
+
+\section{Lệch biên tuyến}
+\label{sec:drift}
+
+\subsection{Hiện tượng}
+
+Bộ giải mã cắt hoán vị thành tuyến dựa trên tải và giờ đến tích luỹ dọc theo hoán vị. Khi đổi thứ tự
+khách trong một tuyến, tải hoặc giờ đến ở cuối tuyến thay đổi, nên khách đầu của tuyến kế tiếp có thể
+được ghép vào tuyến trước, hoặc ngược lại. Bộ tuyến mà bộ giải mã tạo ra từ hoán vị ứng viên khi đó khác
+bộ tuyến đã đề xuất. Nếu tính lợi ích của bước đi trên bộ tuyến đề xuất thì con số đó không phải độ thích
+nghi thật của cá thể.
+
+\subsection{Phản ví dụ}
+
+Xét ba khách nằm trên một đường thẳng, tải trọng xe $Q = 10$, nhu cầu lần lượt $6, 5, 3$ và cắt tuyến
+chỉ theo tải. Hoán vị $(1,2,3)$ được cắt thành $[1] \,|\, [2,3]$ vì $6 + 5 > 10$. Đảo tuyến thứ hai bằng
+2-opt cho bộ tuyến đề xuất $[1] \,|\, [3,2]$, nối lại thành hoán vị $(1,3,2)$. Bộ giải mã cắt lại
+$(1,3,2)$ thành $[1,3] \,|\, [2]$ vì $6 + 3 \le 10$: khách 3 đã lọt sang tuyến đầu.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small},
+  r1/.style={box, fill=blue1!20}, r2/.style={box, fill=orange1!25},
+  lab/.style={font=\footnotesize, align=center}]
+  \node[lab, anchor=east] at (-0.5,0) {hoán vị $(1,2,3)$\\ được cắt thành};
+  \node[r1] at (0,0) {1}; \node[r2] at (1.1,0) {2}; \node[r2] at (1.9,0) {3};
+  \draw[-{Stealth}, thick] (2.6,0) -- (3.6,0) node[midway, above, lab] {2-opt\\ tuyến 2};
+  \node[r1] at (4.2,0) {1}; \node[r2] at (5.3,0) {3}; \node[r2] at (6.1,0) {2};
+  \node[lab] at (5.2,-0.8) {bộ tuyến đề xuất};
+  \draw[-{Stealth}, thick] (6.8,0) -- (7.8,0) node[midway, above, lab] {nối và\\ cắt lại};
+  \node[r1] at (8.4,0) {1}; \node[r1] at (9.2,0) {3}; \node[r2] at (10.3,0) {2};
+  \node[lab] at (9.3,-0.8) {bộ tuyến thật};
+\end{tikzpicture}
+\caption{Phản ví dụ lệch biên tuyến với $Q = 10$, nhu cầu $(6,5,3)$; màu thể hiện tuyến}
+\label{fig:drift}
+\end{figure}
+
+\subsection{Cách xử lý}
+
+Sau khi chấm ứng viên, mô-đun so bộ tuyến bộ giải mã trả về với bộ tuyến đề xuất, so theo đúng thứ tự
+từng phần tử chứ không chỉ so tập khách. Có hai chính sách:
+\begin{itemize}
+  \item \code{reject} (mặc định): bộ tuyến khác thì loại bước đi. Mọi bước được nhận khi đó đúng là bước
+        trong một tuyến, và bộ tuyến của hoán vị kết quả đúng bằng bộ tuyến đã đề xuất.
+  \item \code{evaluate\_actual}: vẫn xét bước đi, nhưng so sánh bằng kết quả \emph{thật} của bộ giải mã
+        cho hoán vị ứng viên. Không có độ thích nghi giả, vì con số dùng để so là con số NSGA-II sẽ dùng.
+        Đổi lại, bước đi lúc này không còn thuần tuý trong tuyến. Sau khi nhận một bước như vậy, lượt
+        duyệt dừng lại và lượt sau bắt đầu trên bộ tuyến mới.
+\end{itemize}
+Với cách cắt \code{capacity\_time} của nhóm, lệch biên rất thường gặp vì chỗ cắt phụ thuộc cả giờ đến:
+trong thực nghiệm (mục~\ref{sec:ls-stats}), phần lớn ứng viên bị lệch biên. Đây là lý do chính sách
+\code{evaluate\_actual} được đưa vào thử nghiệm.
+
+\subsection{Khi bật cắt tuyến bằng quy hoạch động}
+
+Khi \code{dp\_split} của TV4 bật, bộ đánh giá cắt tuyến tối ưu bằng thuật toán split của Prins~\cite{prins2004} theo vectơ trọng số riêng của từng cá
+thể. Bộ cắt này được phép đổi chỗ cắt, nên mô-đun không ép bộ tuyến phải giữ nguyên. Thay vào đó, mọi
+lần chấm trong một lần tìm kiếm cục bộ dùng chung đúng vectơ trọng số của con (truyền qua
+\code{metadata["dp\_weights"]}); mô-đun không bốc lại trọng số DP. Bộ tuyến trả về là bộ tuyến DP thật.
+
+\section{Ràng buộc số xe}
+
+Bộ giải mã chỉ báo số xe có vượt $K$ hay không qua \code{fleet\_ok}, không chặn. Tìm kiếm cục bộ áp dụng
+chính sách: nếu nghiệm hiện tại không vượt đội xe thì ứng viên vượt đội xe bị loại; nếu nghiệm hiện tại
+đã vượt thì chỉ nhận ứng viên không dùng nhiều xe hơn. Như vậy tìm kiếm cục bộ không bao giờ biến một
+nghiệm hợp lệ thành không hợp lệ, cũng không làm vi phạm nặng hơn. Mô-đun không sửa bộ đánh giá chung
+hay cách NSGA-II xử lý ràng buộc.
+
+\section{Ngân sách, bộ nhớ đệm và bộ đếm}
+
+Mỗi lần gọi có ba trần cứng: số ứng viên được chấm (\code{max\_candidate\_evals}, tính cả ứng viên bị
+loại), số bước được nhận (\code{max\_accepted\_moves}) và số lượt duyệt (\code{max\_passes}). Không có
+trần theo thời gian thực, vì trần thời gian làm kết quả phụ thuộc tốc độ máy và mất tính tái lập. Do đó
+một lần gọi gọi bộ đánh giá nhiều nhất $\code{max\_candidate\_evals} + 1$ lần.
+
+Trong một lần gọi, kết quả chấm được lưu đệm theo hoán vị. Một ứng viên bốc trùng (thường gặp ở tuyến
+ngắn) vẫn bị tính vào ngân sách nhưng không gọi lại bộ đánh giá. Bộ nhớ đệm chỉ sống trong một lần gọi
+nên không thể lẫn kết quả giữa hai con có trọng số DP khác nhau.
+
+Các bộ đếm cộng dồn qua một lần chạy: số lần gọi (\code{n\_ls\_calls}), số lần thực sự chạy
+(\code{n\_ls\_triggered}), số ứng viên (\code{n\_ls\_candidate\_evals}), số bước được nhận, số bước bị loại
+theo từng lý do (lệch biên, đội xe, không cải thiện), số yêu cầu chấm và số lần thật sự gọi bộ đánh giá
+(\code{n\_real\_model\_evals}), tổng thời gian. Bộ đếm chỉ để báo cáo, không ảnh hưởng tới thuật toán.
+
+\section{Ví dụ một lần chạy thật}
+
+Bảng~\ref{tab:ls-run} ghi một lần tìm kiếm cục bộ trên một hoán vị ngẫu nhiên (seed 3) của C102-25, với
+tiêu chí tổng có trọng số, ngân sách 40 ứng viên, tối đa 5 bước, 2 lượt. Bộ sinh của lần gọi dùng
+seed 7, nên hai chính sách bốc cùng vectơ trọng số $\mathbf{w} = (0{,}307;\ 0{,}445;\ 0{,}247)$.
+
+\begin{table}[H]
+\centering
+\caption{Một lần tìm kiếm cục bộ trên C102-25 với hai chính sách lệch biên}
+\label{tab:ls-run}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+ & \code{reject} & \code{evaluate\_actual} \\
+\midrule
+$(f_1, f_2, f_3)$ ban đầu & \multicolumn{2}{c}{$(5243{,}9;\ 514{,}4;\ 0{,}3600)$} \\
+$(f_1, f_2, f_3)$ sau tìm kiếm & $(5227{,}3;\ 510{,}7;\ 0{,}3600)$ & $(4799{,}0;\ 478{,}8;\ 0{,}3705)$ \\
+Điểm $S$ trước $\to$ sau & $1{,}2588 \to 1{,}2528$ & $1{,}2588 \to 1{,}1731$ \\
+Số ứng viên đã chấm & 30 & 20 \\
+Số ứng viên bị lệch biên & 24 & 17 \\
+Số ứng viên bị loại do lệch biên & 24 & 0 \\
+Số bước được nhận & 2 & 2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Với \code{reject}, 24 trên 30 ứng viên bị loại vì lệch biên, hai bước được nhận chỉ giảm chi phí
+khoảng 17 CNY. Với \code{evaluate\_actual}, hai bước 2-opt trên cùng một tuyến kéo theo việc cắt lại
+tuyến, giảm chi phí 445 CNY, giảm khí thải 35,6 kg và tăng nhẹ mức hài lòng. Ví dụ này minh hoạ lý do
+cả hai chính sách được đưa vào thực nghiệm.
+
+\section{Giao diện lập trình}
+
+Mô-đun nằm ở \code{src/improvements/local\_search.py}:
+\begin{Verbatim}
+two_opt(route, i, j) -> list[int]
+or_opt(route, start, length, insert_at) -> list[int]
+dominates(a, b, eps=0.0) -> bool
+improve(perm, inst, rng, params, *, decode_and_evaluate, metadata=None,
+        counters=None, scales=None, require_same_routes=True,
+        initial_detail=None) -> LocalSearchResult
+\end{Verbatim}
+\code{LocalSearchResult} gồm hoán vị kết quả, kết quả đánh giá chính xác, số ứng viên, số bước được
+nhận, số lượt, vectơ trọng số và lịch sử các bước được nhận. Lớp \code{LocalSearchHook} trong
+\code{tv2\_hooks.py} bọc hàm này cho NSGA-II: mỗi lần gọi bốc đúng một số để quyết định có chạy hay
+không, tính $\mathbf{s}$ một lần khi khởi tạo và giữ bộ đếm.

@@ -1,0 +1,111 @@
+\chapter{TIẾN ĐỘ, ĐÁNH GIÁ VÀ HƯỚNG HOÀN THIỆN}
+\label{chap:tiendo}
+
+\section{Tiến độ thực hiện}
+
+Bảng~\ref{tab:tiendo} đối chiếu kế hoạch trong README của nhóm với thời điểm thực hiện, lấy theo lịch sử
+commit trên nhánh \code{feat/tv2-init-local-search}.
+
+\begin{table}[H]
+\centering
+\caption{Tiến độ phần việc TV2}
+\label{tab:tiendo}
+\begin{tabularx}{\textwidth}{@{}p{3.3cm}Xp{2.2cm}@{}}
+\toprule
+\textbf{Giai đoạn (kế hoạch)} & \textbf{Công việc} & \textbf{Thực hiện} \\
+\midrule
+Giai đoạn 2 \newline (12/11--18/11) &
+  Khảo sát mã nguồn; cài đặt \code{init\_smart}, \code{local\_search}, lớp dán \code{tv2\_hooks};
+  170 test đơn vị; harness NSGA-II tạm vì \code{nsga2.py} lúc đó chưa có; mốc hồi quy khi tắt cờ;
+  thí nghiệm sơ bộ trên harness; tài liệu hợp đồng giao diện & 12/11 \\
+\midrule
+Giai đoạn 3 \newline (19/11--25/11) &
+  Quy trình ghép nhánh và xử lý xung đột \code{config.yaml}; ghép thử với nhánh của TV4 trong một nhánh
+  tạm và kiểm tra tìm kiếm cục bộ chạy cùng DP split & 12/11 \\
+ & Ghép nhánh chính mới nhất (đã có \code{nsga2.py} của TV1, cải tiến của TV3 và TV4) vào nhánh TV2;
+  gắn hai cải tiến vào \code{nsga2.py} thật; thêm test tích hợp; 432 test pass & 27/11 \\
+\midrule
+Giai đoạn 4 \newline (26/11--02/12) &
+  Chạy lại toàn bộ thực nghiệm trên thuật toán thật (440 lần chạy); sinh bảng và hình tự động; viết
+  báo cáo này & 27/11 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Phần việc của giai đoạn 2 hoàn thành sớm. Phần gắn vào thuật toán thật bị chậm so với kế hoạch: thuật
+toán gốc của TV1 được ghép vào nhánh chính ngày 13/11, nhưng nhánh TV2 chỉ cập nhật nhánh chính vào ngày
+27/11, khi nhóm trưởng đã ghép xong các nhánh của TV3 và TV4. Trong khoảng thời gian đó, thực nghiệm của
+TV2 chạy trên harness tạm; các số liệu trong báo cáo này đều đã được chạy lại trên thuật toán thật. Việc
+ghép bốn nhánh vào nhánh chính ở giai đoạn 3 do nhóm trưởng thực hiện; TV2 chuẩn bị quy trình, mốc hồi
+quy và kiểm tra tương thích.
+
+\section{Đối chiếu với yêu cầu}
+
+\begin{longtable}{@{}p{8.4cm}p{1.8cm}p{4.3cm}@{}}
+\caption{Đối chiếu kết quả với các yêu cầu của phần việc TV2}\label{tab:doichieu}\\
+\toprule
+\textbf{Yêu cầu} & \textbf{Trạng thái} & \textbf{Bằng chứng} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Yêu cầu} & \textbf{Trạng thái} & \textbf{Bằng chứng} \\
+\midrule
+\endhead
+Khởi tạo trộn NN, theo khung giờ và ngẫu nhiên theo tỉ lệ trong cấu hình & Đạt & Chương~\ref{chap:init} \\
+Hai thứ tự tất định có biến thể, quần thể không trùng lặp & Đạt & mục 3.4, 3.5; test \\
+Mọi cá thể là hoán vị hợp lệ; tỉ lệ các nhóm đúng & Đạt & 91 test của \code{init\_smart} \\
+2-opt và Or-opt trong từng tuyến sau đột biến & Đạt & Chương~\ref{chap:ls} \\
+Định nghĩa rõ thế nào là tốt hơn khi có ba mục tiêu & Đạt & mục 4.4: Pareto hoặc tổng có trọng số \\
+Giới hạn số vòng lặp của tìm kiếm cục bộ & Đạt & ba trần cứng, có test \\
+Kiểm tra việc cắt lại tuyến sau khi ghép (lệch biên) & Đạt & mục~\ref{sec:drift}; phản ví dụ trong test \\
+Mỗi tuyến giữ nguyên tập khách; không bước nào làm tuyến tệ hơn theo tiêu chí & Đạt & test \\
+Tham số trong \code{config.yaml}, cờ mặc định tắt & Đạt & mục 3.1, 4.1 \\
+Cờ tắt không dùng bộ sinh ngẫu nhiên; ra đúng thuật toán gốc & Đạt & mục~\ref{sec:regress}: trùng từng bit \\
+Mọi lần đánh giá thêm được đếm vào \code{n\_evals} & Đạt & công thức~\ref{eq:nevals}, có test \\
+Chạy 10 seed trên ít nhất 3 instance, so HV với thuật toán gốc & Đạt & Chương~\ref{chap:thucnghiem}: 4 instance \\
+So sánh cùng số lần đánh giá & Đạt & cấu hình gốc chạy dài \\
+Chuẩn bị mốc hồi quy và quy trình ghép nhánh & Đạt & \code{tv2\_merge\_playbook.md} \\
+Biểu đồ front Pareto 3D, hội tụ HV, hộp HV và IGD & Đạt & hình~\ref{fig:hoitu}--\ref{fig:pareto} \\
+Ghép bốn nhánh vào nhánh chính & Nhóm trưởng thực hiện & lịch sử nhánh chính 27/11 \\
+Kiểm định thống kê chính thức cho toàn bộ ablation & Chưa & thuộc phần việc TV3 \\
+\bottomrule
+\end{longtable}
+
+\section{Đánh giá}
+
+\paragraph{Điểm làm được.} Hai cải tiến chạy được trên thuật toán thật, đúng các quy tắc chung của nhóm, có
+bộ test bao phủ các trường hợp biên và một bằng chứng mạnh rằng nhánh cờ tắt không đổi kết quả: trùng từng
+bit với mốc do TV4 sinh từ mã chưa sửa. Thực nghiệm có tách seed tinh chỉnh khỏi seed báo cáo và có phép so
+ở cùng số lần đánh giá, nên kết luận không bị thiên vị cho tìm kiếm cục bộ. Khởi tạo thông minh cho cải
+thiện rõ và ổn định trên cả bốn instance.
+
+\paragraph{Điểm còn hạn chế.}
+\begin{itemize}
+  \item Tìm kiếm cục bộ tốn nhiều lần đánh giá (gấp 3,3 đến 8,1 lần thuật toán gốc) và chiếm 71 đến 89\%
+        thời gian chạy. Ở cùng số lần đánh giá, nó chỉ có lợi khi đi cùng khởi tạo thông minh và chỉ trên
+        hai trong bốn instance.
+  \item Với chính sách mặc định \code{reject}, phần lớn ứng viên bị loại vì lệch biên tuyến, nên tìm kiếm
+        cục bộ thuần trong tuyến gần như không có tác dụng với cách cắt \code{capacity\_time}.
+  \item Mỗi ứng viên được chấm lại bằng toàn bộ bộ giải mã, $O(n)$, dù chỉ một tuyến thay đổi.
+  \item Thực nghiệm mới trên bốn instance, chưa đủ chín instance Solomon của bài báo.
+  \item Lợi thế của khởi tạo thông minh giảm khi thuật toán được chạy lâu hơn.
+\end{itemize}
+
+\section{Hướng hoàn thiện và cải tiến}
+
+\begin{enumerate}
+  \item \textbf{Chọn chính sách lệch biên mặc định.} Số liệu cho thấy \code{evaluate\_actual} tốt hơn
+        \code{reject} trên các instance lớn và chưa kém ở đâu có ý nghĩa thống kê. Nên đề xuất với TV4 (người
+        phụ trách tinh chỉnh) đổi mặc định sau khi chạy đủ chín instance.
+  \item \textbf{Đánh giá tăng dần.} Thay vì giải mã lại cả hoán vị, chỉ tính lại tuyến bị thay đổi và kiểm
+        tra chỗ cắt ở hai đầu tuyến. Giờ đến trên các tuyến khác không phụ thuộc tuyến này, vì mỗi xe xuất
+        phát độc lập từ kho, nên phần tiết kiệm có thể lớn với $n = 100$.
+  \item \textbf{Bước đi giữa các tuyến.} Thêm relocate, swap và 2-opt* giữa hai tuyến. Với cách cắt theo
+        thời gian, chuyển khách giữa các tuyến có thể hợp với cấu trúc bài toán hơn bước đi trong tuyến.
+  \item \textbf{Chọn cá thể để tìm kiếm cục bộ.} Chỉ áp dụng cho con thuộc front tốt nhất, hoặc giảm $p_{ls}$
+        theo thời gian, để giảm số lần đánh giá ở các thế hệ đầu khi quần thể còn kém.
+  \item \textbf{Khởi tạo đa dạng hơn.} Dùng láng giềng gần nhất ngẫu nhiên hoá (chọn trong $k$ khách gần
+        nhất) hoặc heuristic chèn có xét khung thời gian kiểu Solomon I1 thay cho phép hoán đổi ngẫu nhiên.
+  \item \textbf{Thực nghiệm đầy đủ.} Chạy trên chín instance Solomon và case29, so cả theo thời gian chạy,
+        và để TV3 áp dụng kiểm định có hiệu chỉnh cho nhiều phép so sánh.
+\end{enumerate}

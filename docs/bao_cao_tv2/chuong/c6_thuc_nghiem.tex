@@ -1,0 +1,259 @@
+\chapter{THỰC NGHIỆM}
+\label{chap:thucnghiem}
+
+\section{Thiết lập}
+
+\paragraph{Thuật toán và tham số.} Mọi lần chạy dùng \code{src/nsga2.py} của nhóm sau khi ghép nhánh
+chính, với cấu hình mặc định: $N_{pop} = 80$, $G = 200$, lai ghép OX với $p_c = 0{,}7$, đột biến chuẩn
+với $p_m = 0{,}1$ (Solomon) hoặc $0{,}2$ (case29), giải đấu kích thước 2, loại cá thể trùng, cắt tuyến
+\code{capacity\_time}, tính hài lòng theo giờ đến. Các cải tiến của TV3 và TV4 đều tắt. Hai cải tiến của
+TV2 dùng tham số mặc định nêu ở Chương~\ref{chap:init} và Chương~\ref{chap:ls}.
+
+\paragraph{Instance.} C102-25, R201-50, RC201-100 và case29-29, đại diện cho ba kiểu phân bố khách của
+bộ Solomon, ba cỡ bài toán và dữ liệu thực tế.
+
+\paragraph{Cấu hình so sánh.}
+\begin{itemize}
+  \item \textbf{Gốc}: thuật toán của TV1, mọi cờ tắt.
+  \item \textbf{init\_smart}: chỉ bật khởi tạo thông minh.
+  \item \textbf{LS (reject)}: chỉ bật tìm kiếm cục bộ, chính sách lệch biên mặc định.
+  \item \textbf{LS (evaluate\_actual)}: chỉ bật tìm kiếm cục bộ, chính sách \code{evaluate\_actual}.
+  \item \textbf{init + LS}: bật cả hai, với từng chính sách lệch biên.
+  \item \textbf{Gốc, cùng số lần đánh giá}: thuật toán gốc chạy thêm thế hệ để tổng số lần đánh giá bằng
+        trung bình của cấu hình init + LS (evaluate\_actual) trên cùng instance (670, 1016, 1374 và 1030
+        thế hệ cho bốn instance).
+\end{itemize}
+Cấu hình cuối cần thiết vì tìm kiếm cục bộ gọi bộ đánh giá nhiều hơn hẳn. So ở cùng 200 thế hệ là có lợi
+cho các cấu hình có tìm kiếm cục bộ; so với thuật toán gốc được cấp cùng số lần đánh giá mới cho biết
+tìm kiếm cục bộ có dùng ngân sách đánh giá hiệu quả hơn việc chạy thêm thế hệ hay không.
+
+\paragraph{Seed.} Tinh chỉnh tham số dùng seed 100 đến 104. Kết quả báo cáo dùng seed 0 đến 9, giống
+nhau cho mọi cấu hình. Không có tham số nào được chọn dựa trên seed 0 đến 9.
+
+\paragraph{Chỉ số.} HV, IGD, SP và số điểm trên front tính bằng \code{src.runner analyze} của nhóm,
+theo quy ước ở mục 2.7: tập tham chiếu và cận chuẩn hoá lấy chung từ mọi cấu hình, mọi seed trên cùng
+instance. Giá trị $p$ là kiểm định Wilcoxon rank-sum trên 10 giá trị HV của cấu hình đó so với thuật toán
+gốc 200 thế hệ. Toàn bộ số liệu trong các bảng dưới đây được sinh tự động bởi
+\code{scripts/tv2\_report\_figures.py}.
+
+\section{Tinh chỉnh tham số}
+
+Bảng~\ref{tab:tune} so ba tỉ lệ khởi tạo và bốn biến thể tìm kiếm cục bộ, mỗi biến thể thay đúng một
+tham số so với mặc định, chạy trên seed 100 đến 104.
+
+\begin{table}[H]
+\centering
+\caption{HV trung bình $\pm$ độ lệch chuẩn khi tinh chỉnh (seed 100--104; in đậm là biến thể tốt nhất
+trong nhóm khởi tạo và nhóm tìm kiếm cục bộ)}
+\label{tab:tune}
+\resizebox{\textwidth}{!}{\input{so_lieu/tune}}
+\end{table}
+
+Tỉ lệ $0{,}2/0{,}2/0{,}6$ cho HV cao nhất trên ba trong bốn instance; trên case29, tỉ lệ $0{,}3/0{,}3/0{,}4$
+tốt hơn. Vì không có tỉ lệ nào thắng đều, nhóm giữ tỉ lệ mặc định. Với tìm kiếm cục bộ, chính sách
+\code{evaluate\_actual} tốt nhất trên R201-50 và RC201-100, \code{reject} tốt nhất trên C102-25. Trên
+case29, hai chính sách bằng nhau (0,798) và giảm $p_{ls}$ xuống $0{,}1$ cho HV cao nhất (0,812).
+Chấp nhận theo trội Pareto và giảm $p_{ls}$ không tốt hơn mặc định một cách nhất quán trên cả bốn
+instance. Vì hai chính sách lệch biên cho kết quả trái chiều, thí nghiệm chính
+chạy cả hai.
+
+\section{Hiệu quả của khởi tạo thông minh}
+
+\subsection{Quần thể ban đầu}
+
+Bảng~\ref{tab:init} so quần thể ban đầu của thuật toán gốc và của \code{init\_smart} với cùng seed. HV ở
+đây được chuẩn hoá theo hợp các front ban đầu của hai cấu hình, vì front ban đầu nằm ngoài vùng chuẩn
+hoá của các front cuối.
+
+\begin{table}[H]
+\centering
+\caption{Quần thể ban đầu (trung bình 10 seed): HV, $f_1$ nhỏ nhất và $f_3$ lớn nhất}
+\label{tab:init}
+\resizebox{\textwidth}{!}{\input{so_lieu/init}}
+\end{table}
+
+Trên cả bốn instance, quần thể ban đầu của \code{init\_smart} có HV gấp khoảng 4 đến 10 lần, chi phí nhỏ nhất
+thấp hơn và mức hài lòng lớn nhất cao hơn. Khác biệt lớn nhất ở RC201-100: chi phí nhỏ nhất giảm từ
+45.377 xuống 24.107 CNY, mức hài lòng lớn nhất tăng từ 0,259 lên 0,496. Hình~\ref{fig:init} cho thấy
+nguyên nhân: các cá thể dựng từ thứ tự NN nằm ở vùng chi phí thấp, các cá thể dựng từ thứ tự TW nằm ở
+vùng hài lòng cao, còn các cá thể ngẫu nhiên (của cả hai cấu hình) nằm chung một đám ở vùng kém.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{quan_the_dau.pdf}
+\caption{Quần thể ban đầu với seed 0 trên mặt phẳng $f_1$--$f_3$: thuật toán gốc (vòng tròn rỗng) và
+\code{init\_smart} theo từng nguồn}
+\label{fig:init}
+\end{figure}
+
+\subsection{Kết quả cuối}
+
+Ở cùng 200 thế hệ và cùng 16.080 lần đánh giá, \code{init\_smart} cho HV cao hơn hẳn thuật toán gốc trên
+cả bốn instance với $p < 0{,}001$ (bảng~\ref{tab:main-c102} đến~\ref{tab:main-case29}): C102-25 từ 0,663
+lên 1,099; R201-50 từ 0,385 lên 0,687; RC201-100 từ 0,328 lên 0,877; case29-29 từ 0,550 lên 0,775. IGD
+giảm tương ứng và độ lệch chuẩn của HV nhỏ hơn, tức kết quả ổn định hơn giữa các seed. Cải tiến này
+không tốn thêm lần đánh giá nào và thời gian chạy gần như không đổi.
+
+So với thuật toán gốc được chạy dài hơn 3,3 đến 6,8 lần số lần đánh giá, \code{init\_smart} 200 thế hệ
+vẫn tốt hơn trên C102-25 (1,099 so với 0,911, $p = 0{,}034$) nhưng kém hơn trên ba instance còn lại
+($p$ từ 0,0007 đến 0,028). Như vậy khởi tạo thông minh chủ yếu giúp thuật toán tới vùng tốt nhanh hơn;
+khi được chạy đủ lâu, thuật toán gốc vẫn bắt kịp và vượt.
+
+\section{Hiệu quả của tìm kiếm cục bộ}
+
+\subsection{Bảng kết quả}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả trên C102-25 (10 seed; $G$ là số thế hệ; $p$ so với Gốc 200 thế hệ)}
+\label{tab:main-c102}
+\resizebox{\textwidth}{!}{\input{so_lieu/main_C102-25}}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả trên R201-50}
+\label{tab:main-r201}
+\resizebox{\textwidth}{!}{\input{so_lieu/main_R201-50}}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả trên RC201-100}
+\label{tab:main-rc201}
+\resizebox{\textwidth}{!}{\input{so_lieu/main_RC201-100}}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả trên case29-29}
+\label{tab:main-case29}
+\resizebox{\textwidth}{!}{\input{so_lieu/main_case29-29}}
+\end{table}
+
+\subsection{Tìm kiếm cục bộ đứng riêng}
+
+Với chính sách \code{reject}, tìm kiếm cục bộ đứng riêng không tạo khác biệt có ý nghĩa thống kê so với
+thuật toán gốc trên instance nào ($p$ từ 0,151 đến 0,705), dù dùng gấp 4,1 đến 7,9 lần số lần đánh giá.
+Với \code{evaluate\_actual}, HV tăng có ý nghĩa trên R201-50 ($p = 0{,}016$), RC201-100 ($p < 0{,}001$) và
+case29-29 ($p = 0{,}008$), không có ý nghĩa trên C102-25. Trên RC201-100, \code{evaluate\_actual} tốt
+hơn \code{reject} rõ rệt (HV 0,544 so với 0,377, $p = 0{,}0009$; front của nó phủ trung bình 96\% front
+của \code{reject} theo SC).
+
+\subsection{Thống kê bên trong tìm kiếm cục bộ}
+\label{sec:ls-stats}
+
+\begin{table}[H]
+\centering
+\caption{Thống kê tìm kiếm cục bộ (trung bình một lần chạy 200 thế hệ; tỉ lệ tính trên số ứng viên)}
+\label{tab:lsstats}
+\resizebox{\textwidth}{!}{\input{so_lieu/ls_stats}}
+\end{table}
+
+Bảng~\ref{tab:lsstats} giải thích kết quả trên. Mỗi lần chạy có khoảng 3.200 lần tìm kiếm cục bộ được
+kích hoạt, đúng với kỳ vọng $p_{ls} \cdot N_{pop} \cdot G = 0{,}2 \cdot 80 \cdot 200 = 3.200$. Trên ba
+instance Solomon, 68 đến 88\% ứng viên bị lệch biên tuyến. Với chính sách \code{reject}, toàn bộ số ứng
+viên đó bị loại và chỉ 2,7 đến 4,5\% ứng viên được nhận: phần lớn ngân sách đánh giá bị tiêu vào các
+bước không bao giờ được dùng. Với \code{evaluate\_actual}, tỉ lệ nhận tăng khoảng gấp đôi (5,4 đến 9,9\%)
+và cùng ngân sách đổi được nhiều cải thiện hơn. Trên case29, tỉ lệ lệch biên chỉ 13 đến 17\%: dữ liệu này
+có tải trọng 4000 kg, chưa giới hạn số xe và khung thời gian rộng, nên chỗ cắt tuyến ít nhạy với thứ tự
+khách bên trong một tuyến.
+
+Chính sách số xe gần như không phải can thiệp: chỉ trên RC201-100 với \code{evaluate\_actual} có khoảng
+1\% ứng viên bị loại vì làm tăng số xe vượt giới hạn. Cột cuối cho thấy tìm kiếm cục bộ chiếm 71 đến 89\%
+thời gian chạy, nên đây là phần tốn kém nhất của thuật toán khi bật cải tiến này.
+
+\subsection{Kết hợp hai cải tiến}
+
+Cấu hình init + LS (evaluate\_actual) cho HV cao nhất trong các cấu hình 200 thế hệ trên cả bốn instance.
+So với chỉ bật \code{init\_smart}, phần tìm kiếm cục bộ thêm vào làm HV tăng có ý nghĩa trên C102-25
+($p = 0{,}019$), R201-50 ($p = 0{,}016$) và RC201-100 ($p = 0{,}0004$), không có ý nghĩa trên case29-29
+($p = 0{,}36$). Trên RC201-100, chính sách \code{evaluate\_actual} cũng tốt hơn \code{reject} khi đã có
+khởi tạo thông minh (HV 1,080 so với 0,944, $p = 0{,}019$).
+
+\subsection{So sánh ở cùng số lần đánh giá}
+
+Đây là phép so công bằng nhất cho tìm kiếm cục bộ. So init + LS (evaluate\_actual) với thuật toán gốc chạy
+đủ lâu để có cùng số lần đánh giá:
+\begin{itemize}
+  \item C102-25: cấu hình kết hợp tốt hơn rõ (HV 1,193 so với 0,911, $p = 0{,}0005$; front của nó phủ
+        trung bình 86\% front của thuật toán gốc, chiều ngược lại chỉ 4\%);
+  \item RC201-100: cấu hình kết hợp tốt hơn (HV 1,080 so với 1,001, $p = 0{,}034$);
+  \item R201-50 và case29-29: thuật toán gốc chạy dài có HV cao hơn (0,898 so với 0,812 và 0,874 so với
+        0,803), nhưng khác biệt chưa có ý nghĩa thống kê ($p = 0{,}096$ ở cả hai).
+\end{itemize}
+Mọi cấu hình chỉ có tìm kiếm cục bộ (không có khởi tạo thông minh) đều kém thuật toán gốc chạy dài. Kết
+luận là trong cấu hình hiện tại, tìm kiếm cục bộ chỉ đáng dùng khi đi kèm khởi tạo thông minh, và lợi
+ích phụ thuộc instance.
+
+\section{Hội tụ, phân bố kết quả và mặt Pareto}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{hoi_tu_hv.pdf}
+\caption{HV của front tốt nhất theo thế hệ, trung bình $\pm$ độ lệch chuẩn qua 10 seed}
+\label{fig:hoitu}
+\end{figure}
+
+Hình~\ref{fig:hoitu} cho thấy hai nhóm đường tách bạch. Các cấu hình có \code{init\_smart} có HV dương
+ngay từ những thế hệ đầu và tăng nhanh trong khoảng 25 thế hệ đầu. Trên ba instance Solomon, các cấu
+hình bắt đầu từ quần thể ngẫu nhiên có HV trung bình bằng 0 trong 10 đến 28 thế hệ đầu, vì front lúc đó
+nằm ngoài vùng chuẩn hoá chung (điều này đã được ghi trong README của nhóm và là bình thường); trên
+case29-29, HV dương ngay từ thế hệ thứ nhất. Ở mọi instance, HV vẫn còn tăng ở thế hệ 200, tức
+200 thế hệ chưa đủ để thuật toán hội tụ hẳn.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{box_C102-25.pdf}\\[2pt]
+\includegraphics[width=\textwidth]{box_R201-50.pdf}
+\caption{Phân bố HV và IGD qua 10 seed trên C102-25 và R201-50}
+\label{fig:box1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{box_RC201-100.pdf}\\[2pt]
+\includegraphics[width=\textwidth]{box_case29-29.pdf}
+\caption{Phân bố HV và IGD qua 10 seed trên RC201-100 và case29-29}
+\label{fig:box2}
+\end{figure}
+
+Biểu đồ hộp ở hình~\ref{fig:box1} và~\ref{fig:box2} xác nhận các nhận xét ở trên: hộp của các cấu hình có
+\code{init\_smart} nằm cao hơn và hẹp hơn hộp của thuật toán gốc 200 thế hệ; hộp của thuật toán gốc chạy
+dài (viền nét đứt) nằm cùng mức với các cấu hình kết hợp trên R201-50 và case29-29.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{pareto_3d.pdf}
+\caption{Front cuối không bị trội với seed 0, đơn vị gốc ($f_1$, $f_2$ cực tiểu, $f_3$ cực đại; số trong
+ngoặc là số điểm trên front)}
+\label{fig:pareto}
+\end{figure}
+
+Hình~\ref{fig:pareto} vẽ front cuối của bốn cấu hình với seed 0. Front của các cấu hình có khởi tạo thông
+minh nằm ở vùng chi phí và khí thải thấp hơn hẳn, nhất là trên RC201-100. Hệ số tương quan Pearson giữa
+$f_1$ và $f_2$ trên front gộp 10 seed dao động từ $-0{,}03$ đến 0,96 tuỳ cấu hình và instance. Tương quan
+cao khi $f_1$ chủ yếu đi theo quãng đường, vì $f_2$ tỉ lệ với quãng đường; tương quan thấp khi phần phạt
+đến muộn $F_4$ chi phối $f_1$, đúng như nhóm đã nhận xét ở giai đoạn 1 với các instance 100 khách.
+
+Về ràng buộc số xe, front cuối của mọi cấu hình, mọi seed trên cả bốn instance đều không vượt giới hạn số
+xe. Trội có ràng buộc của thuật toán gốc loại các nghiệm vượt giới hạn, và tìm kiếm cục bộ không làm nghiệm
+hợp lệ trở thành không hợp lệ.
+
+\section{Thảo luận}
+
+\paragraph{Khởi tạo thông minh.} Đây là cải tiến có lợi rõ nhất: tốt hơn thuật toán gốc ở cả bốn instance,
+không tốn thêm lần đánh giá, kết quả ổn định hơn giữa các seed. Hai heuristic bổ sung cho nhau: NN gieo
+điểm ở vùng chi phí thấp, TW gieo điểm ở vùng hài lòng cao. Hạn chế là lợi thế giảm dần khi thuật toán
+được chạy lâu hơn.
+
+\paragraph{Tìm kiếm cục bộ.} Cách cắt tuyến \code{capacity\_time} làm phần lớn bước đi trong một tuyến bị
+lệch biên, nên phiên bản thuần trong tuyến (\code{reject}) lãng phí phần lớn ngân sách đánh giá và không
+hiệu quả. Cho phép đánh giá bằng bộ tuyến thật (\code{evaluate\_actual}) khắc phục được một phần và đem
+lại cải thiện có ý nghĩa trên các instance lớn. Tuy vậy, ở cùng số lần đánh giá, tìm kiếm cục bộ chỉ thắng
+thuật toán gốc chạy dài khi đi cùng khởi tạo thông minh, và chỉ trên hai trong bốn instance.
+
+\paragraph{Giới hạn của thực nghiệm.} Thực nghiệm dùng bốn instance và 10 seed; kết luận chưa được kiểm
+chứng trên đủ chín instance Solomon của bài báo. Kiểm định rank-sum được thực hiện riêng cho từng cặp,
+không hiệu chỉnh cho nhiều phép so sánh. Các seed được ghép cặp giữa các cấu hình nên kiểm định có dấu
+hạng (signed-rank) có thể phù hợp hơn; việc chọn kiểm định chính thức thuộc phần việc của TV3.

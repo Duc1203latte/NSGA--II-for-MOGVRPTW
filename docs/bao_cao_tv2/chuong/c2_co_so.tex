@@ -1,0 +1,127 @@
+\chapter{CƠ SỞ LÝ THUYẾT}
+\label{chap:coso}
+
+\section{Tối ưu đa mục tiêu và quan hệ trội Pareto}
+
+Để so sánh lời giải theo cùng một chiều, nhóm đưa ba mục tiêu về dạng cùng cực tiểu hoá:
+\begin{equation}
+  \mathbf{g}(\pi) = \big(g_1, g_2, g_3\big) = \big(f_1(\pi),\; f_2(\pi),\; 1 - f_3(\pi)\big).
+\end{equation}
+Lời giải $a$ \emph{trội} lời giải $b$, ký hiệu $a \prec b$, khi $a$ không tệ hơn $b$ ở mọi mục tiêu và
+tốt hơn hẳn ở ít nhất một mục tiêu:
+\begin{equation}
+  a \prec b \iff \forall k:\ g_k(a) \le g_k(b) \;\;\text{và}\;\; \exists j:\ g_j(a) < g_j(b).
+\end{equation}
+Tập các lời giải không bị lời giải nào trội gọi là tập Pareto; ảnh của nó trong không gian mục tiêu
+gọi là mặt Pareto (front). Mục đích của thuật toán là tìm một tập xấp xỉ mặt Pareto vừa gần mặt thật,
+vừa trải đều.
+
+Trong phần tìm kiếm cục bộ, phép so sánh dùng thêm một sai số $\varepsilon \ge 0$ để tránh chấp nhận
+các thay đổi chỉ do sai số làm tròn số thực:
+\begin{equation}
+  a \prec_\varepsilon b \iff \forall k:\ g_k(a) \le g_k(b) + \varepsilon \;\;\text{và}\;\;
+  \exists j:\ g_j(a) < g_j(b) - \varepsilon .
+  \label{eq:dom-eps}
+\end{equation}
+
+\section{Thuật toán NSGA-II}
+
+NSGA-II do Deb và cộng sự đề xuất năm 2002~\cite{deb2002}. Ý tưởng chính gồm ba phần.
+
+\paragraph{Sắp xếp không trội nhanh.} Quần thể được chia thành các front $\mathcal{F}_1,
+\mathcal{F}_2,\dots$: $\mathcal{F}_1$ là các cá thể không bị ai trội; bỏ $\mathcal{F}_1$ đi thì các cá
+thể không bị ai trội còn lại tạo thành $\mathcal{F}_2$, cứ thế tiếp tục. Hạng của cá thể là chỉ số
+front chứa nó. Với $M$ mục tiêu và $N$ cá thể, độ phức tạp là $O(MN^2)$.
+
+\paragraph{Khoảng cách đông đúc.} Trong cùng một front, cá thể nằm ở vùng thưa được ưu tiên để giữ đa
+dạng. Với mỗi mục tiêu $k$, sắp các cá thể theo $g_k$; hai cá thể ở hai đầu nhận khoảng cách vô cùng,
+cá thể ở giữa được cộng thêm
+\begin{equation}
+  \frac{g_k(\text{sau}) - g_k(\text{trước})}{g_k^{\max} - g_k^{\min}} .
+\end{equation}
+
+\paragraph{Chọn lọc tinh hoa.} Cha mẹ và con được gộp thành $2N_{pop}$ cá thể, rồi lấy lần lượt từng
+front cho đến khi đủ $N_{pop}$; front cuối cùng bị cắt theo khoảng cách đông đúc giảm dần. Cha mẹ được
+chọn bằng giải đấu nhị phân: hạng thấp hơn thắng, cùng hạng thì khoảng cách lớn hơn thắng.
+
+\paragraph{Trội có ràng buộc.} Nhóm xử lý giới hạn số xe bằng cách gán cho mỗi cá thể mức vi phạm
+$CV = \max(0, m - K)$. Cá thể có $CV$ nhỏ hơn luôn trội; cùng $CV$ thì so theo trội Pareto. Cách này
+không cần chọn hệ số phạt.
+
+\section{Giải thuật lai và vai trò của khởi tạo, tìm kiếm cục bộ}
+
+Thuật toán di truyền tìm kiếm tốt trên diện rộng nhưng tinh chỉnh chậm: lai ghép và đột biến là phép
+biến đổi mù, không biết thay đổi nào làm lời giải tốt hơn. Hai cách bổ sung kinh điển là:
+\begin{itemize}
+  \item \textbf{Khởi tạo có định hướng}: đưa vào quần thể ban đầu một số lời giải dựng bằng heuristic,
+        để thuật toán xuất phát gần vùng tốt thay vì từ các hoán vị ngẫu nhiên.
+  \item \textbf{Tìm kiếm cục bộ sau biến đổi di truyền}: sau khi sinh con, cải thiện con bằng các bước
+        nhỏ có kiểm tra mục tiêu. Thuật toán di truyền kết hợp tìm kiếm cục bộ thường gọi là giải thuật
+        memetic~\cite{moscato1989}.
+\end{itemize}
+Cả hai đều có rủi ro. Khởi tạo quá thiên về heuristic làm mất đa dạng ban đầu. Tìm kiếm cục bộ tốn
+thêm nhiều lần đánh giá, nên khi so với thuật toán gốc phải so cả theo cùng số lần đánh giá, không chỉ
+theo cùng số thế hệ.
+
+\section{Các heuristic khởi tạo cho bài toán định tuyến}
+
+\paragraph{Láng giềng gần nhất (NN).} Xuất phát từ kho, mỗi bước đi tới khách chưa ghé gần điểm hiện tại
+nhất. Thứ tự này cho tổng quãng đường ngắn ở phần đầu, có lợi cho $f_2$ và $F_3$, nhưng không xét khung
+thời gian nên có thể đến muộn nhiều khách.
+
+\paragraph{Sắp theo khung thời gian (TW).} Xếp khách theo giờ mở khung kỳ vọng $ETa$ tăng dần. Khách cần
+nhận hàng sớm được phục vụ trước, có lợi cho $f_3$ và phần phạt $F_4$, nhưng có thể đi vòng xa.
+
+\paragraph{Ngẫu nhiên.} Giữ phần lớn quần thể là hoán vị ngẫu nhiên như thuật toán gốc để duy trì đa dạng.
+
+\section{Các phép tìm kiếm cục bộ trong một tuyến}
+
+\paragraph{2-opt~\cite{croes1958}.} Chọn hai vị trí $i<j$ trong một tuyến và đảo ngược đoạn
+$[i, j]$. Trên đường đi, phép này bỏ hai cạnh và nối lại theo cách khác, thường dùng để gỡ các đoạn đi
+cắt chéo nhau.
+
+\paragraph{Or-opt~\cite{or1976}.} Cắt một khối $L \in \{1,2,3\}$ khách liên tiếp, giữ nguyên thứ tự bên
+trong khối, rồi chèn khối vào vị trí khác của cùng tuyến. Phép này bỏ ba cạnh và nối lại.
+
+Cả hai phép đều không đổi tập khách của tuyến, chỉ đổi thứ tự ghé. Với bài toán có khung thời gian, đổi
+thứ tự làm đổi giờ đến của các khách phía sau, nên ảnh hưởng đồng thời tới $F_1$ (tải trên từng chặng),
+$F_3$ và $f_2$ (quãng đường), $F_4$ và $f_3$ (giờ đến).
+
+\section{Tiêu chí chấp nhận bước đi khi có nhiều mục tiêu}
+
+Tìm kiếm cục bộ một mục tiêu chỉ cần kiểm tra giá trị mới nhỏ hơn giá trị cũ. Với ba mục tiêu có hai
+cách thông dụng.
+
+\paragraph{Chấp nhận theo trội Pareto.} Chỉ nhận bước đi khi lời giải mới trội lời giải cũ
+(công thức~\ref{eq:dom-eps}). Cách này an toàn: không bao giờ làm xấu mục tiêu nào. Nhược điểm là rất
+khó thoả, vì một bước đi thường cải thiện mục tiêu này nhưng làm xấu nhẹ mục tiêu khác.
+
+\paragraph{Chấp nhận theo tổng có trọng số.} Chọn vectơ trọng số $\mathbf{w} \ge 0$,
+$\sum_k w_k = 1$ và vectơ hệ số chuẩn hoá $\mathbf{s} > 0$, rồi nhận bước đi khi
+\begin{equation}
+  S(\mathbf{g}) = \sum_{k=1}^{3} w_k\,\frac{g_k}{s_k}
+  \quad\text{giảm hơn } \varepsilon .
+  \label{eq:score}
+\end{equation}
+Hệ số chuẩn hoá cần thiết vì $f_1$ cỡ vài nghìn trong khi $1-f_3$ nhỏ hơn 1; không chuẩn hoá thì $f_1$
+lấn át hoàn toàn. Mỗi vectơ trọng số hướng tìm kiếm về một vùng của mặt Pareto, nên bốc trọng số ngẫu
+nhiên cho mỗi lần chạy tìm kiếm cục bộ giúp các con được đẩy về nhiều hướng khác nhau. Cách này dễ thoả
+hơn, nhưng một bước được nhận không nhất thiết là cải thiện Pareto: một mục tiêu riêng lẻ có thể xấu đi.
+
+\section{Các chỉ số đánh giá tập nghiệm}
+
+Nhóm dùng các chỉ số sau, tính trên mục tiêu đã chuẩn hoá (\code{src/metrics.py}).
+\begin{itemize}
+  \item \textbf{HV}: thể tích vùng bị front trội, giới hạn bởi điểm tham chiếu $(1{,}1;\,1{,}1;\,1{,}1)$.
+        Càng lớn càng tốt, tối đa $1{,}1^3 = 1{,}331$~\cite{zitzler1999}.
+  \item \textbf{IGD}: khoảng cách trung bình từ mỗi điểm của tập tham chiếu tới điểm gần nhất của front.
+        Càng nhỏ càng tốt.
+  \item \textbf{SP}: độ lệch chuẩn của khoảng cách từ mỗi điểm tới điểm gần nó nhất. Càng nhỏ thì front
+        càng đều.
+\end{itemize}
+Tập tham chiếu của một instance là phần không bị trội của hợp tất cả front cuối, gộp mọi cấu hình và
+mọi seed. HV và IGD được tính bằng thư viện pymoo~\cite{pymoo}. Mỗi mục tiêu được chuẩn hoá về $[0,1]$ theo giá trị nhỏ nhất và lớn nhất trên mọi điểm của
+mọi front. Vì tập tham chiếu và cận chuẩn hoá phụ thuộc toàn bộ các cấu hình được so, số HV chỉ có ý
+nghĩa khi so giữa các cấu hình trong cùng một thí nghiệm và cùng một instance.
+
+Để kiểm định khác biệt, nhóm dùng kiểm định Wilcoxon rank-sum trên 10 giá trị HV của hai cấu hình.

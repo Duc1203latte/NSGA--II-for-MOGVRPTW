@@ -1,0 +1,111 @@
+% Báo cáo phần việc TV2 - Bài tập lớn Tính toán tiến hoá
+% Biên dịch: xelatex bao_cao_tv2.tex (chạy 2 lần để có mục lục, danh mục hình/bảng)
+\documentclass[a4paper,fontsize=13pt,oneside,listof=totoc,bibliography=totoc,
+               headings=normal,numbers=noenddot]{scrreprt}
+
+% ----------------------------------------------------------------- thông tin sinh viên (điền)
+\newcommand{\TenTruong}{TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG}
+\newcommand{\HocPhan}{TÍNH TOÁN TIẾN HOÁ}
+\newcommand{\TenSV}{[Họ và tên sinh viên]}
+\newcommand{\MSSV}{[Mã số sinh viên]}
+\newcommand{\Lop}{[Mã lớp học phần]}
+\newcommand{\GVHD}{[Họ tên giảng viên]}
+\newcommand{\Nhom}{[Tên nhóm]}
+
+% ----------------------------------------------------------------- trang, font, ngôn ngữ
+\usepackage[left=3cm,right=2cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setmonofont[Scale=0.85]{Consolas}
+\usepackage[vietnamese]{babel}
+\usepackage{setspace}
+\setstretch{1.3}
+\usepackage{indentfirst}
+\setlength{\parindent}{1cm}
+\setlength{\parskip}{4pt}
+
+% ----------------------------------------------------------------- tiêu đề chương, mục
+\RedeclareSectionCommand[beforeskip=0pt,afterskip=1.2\baselineskip]{chapter}
+\renewcommand*{\raggedchapter}{\centering}
+\renewcommand*{\chapterformat}{\MakeUppercase{\chaptername}~\thechapter.\enskip}
+\renewcommand*{\chapterlinesformat}[3]{#2#3}
+\setkomafont{disposition}{\rmfamily\bfseries}
+\setkomafont{chapter}{\rmfamily\bfseries\fontsize{15}{19}\selectfont}
+\setkomafont{section}{\rmfamily\bfseries\fontsize{14}{17}\selectfont}
+\setkomafont{subsection}{\rmfamily\bfseries\itshape\fontsize{13}{16}\selectfont}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+
+% ----------------------------------------------------------------- toán, bảng, hình
+\usepackage{amsmath,mathtools}
+\usepackage{unicode-math}
+\setmathfont{TeX Gyre Termes Math}
+\usepackage{graphicx}
+\graphicspath{{hinh/}}
+\usepackage{booktabs,multirow,array,tabularx,longtable}
+\usepackage{xcolor}
+\definecolor{hustred}{HTML}{C8102E}
+\definecolor{blue1}{HTML}{2a78d6}
+\definecolor{orange1}{HTML}{eb6834}
+\definecolor{aqua1}{HTML}{1baf7a}
+\definecolor{yellow1}{HTML}{eda100}
+\definecolor{grayline}{HTML}{8a8a85}
+\usepackage[font=small,labelfont=bf,labelsep=period,justification=centering]{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\SetAlgorithmName{Thuật toán}{thuật toán}{Danh mục thuật toán}
+\SetKwInput{KwIn}{Đầu vào}
+\SetKwInput{KwOut}{Đầu ra}
+\SetAlFnt{\small}
+\usepackage{fancyvrb}
+\fvset{frame=single,framesep=5pt,fontsize=\small,rulecolor=\color{grayline}}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,framerule=0.4pt,
+        rulecolor=\color{grayline},columns=fullflexible,keepspaces=true,extendedchars=true}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\usepackage{siunitx}
+\sisetup{output-decimal-marker={,},group-separator={.},group-minimum-digits=4}
+\usepackage[hidelinks]{hyperref}
+
+% ----------------------------------------------------------------- đầu trang, chân trang
+\usepackage[headsepline=0.4pt]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{\small\itshape Báo cáo phần việc TV2: khởi tạo thông minh và tìm kiếm cục bộ}
+\cfoot*{\pagemark}
+\renewcommand*{\chapterpagestyle}{plain.scrheadings}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+\input{chuong/bia}
+
+\pagenumbering{roman}
+\input{chuong/loi_mo_dau}
+\tableofcontents
+\listoffigures
+\listoftables
+\input{chuong/viet_tat}
+
+\cleardoublepage
+\pagenumbering{arabic}
+\input{chuong/c1_tong_quan}
+\input{chuong/c2_co_so}
+\input{chuong/c3_init_smart}
+\input{chuong/c4_local_search}
+\input{chuong/c5_tich_hop}
+\input{chuong/c6_thuc_nghiem}
+\input{chuong/c7_tien_do}
+\input{chuong/ket_luan}
+
+\input{chuong/tai_lieu}
+\appendix
+\renewcommand*{\chapterformat}{PHỤ LỤC~\thechapter.\enskip}
+\input{chuong/phu_luc}
+\end{document}

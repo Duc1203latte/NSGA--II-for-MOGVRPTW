@@ -1,0 +1,140 @@
+\chapter{TỔNG QUAN BÀI TOÁN VÀ NHIỆM VỤ CỦA TV2}
+\label{chap:tongquan}
+
+\section{Bài toán định tuyến xe xanh đa mục tiêu có khung thời gian}
+
+Một công ty có một kho hàng và một đội xe tải giống nhau, cần giao hàng cho $n$ khách. Mỗi khách $i$
+có toạ độ, lượng hàng cần nhận $q_i$, thời gian dỡ hàng $s_i$ và hai khung thời gian lồng nhau: khung kỳ
+vọng $[ETa_i, LTb_i]$ là khoảng khách muốn nhận hàng nhất, khung chấp nhận được $[ET_i, LT_i]$ rộng hơn,
+ngoài khung này khách không hài lòng chút nào. Mỗi xe xuất phát từ kho, đi qua một số khách theo một thứ
+tự rồi quay về kho. Tổng lượng hàng trên một xe không vượt quá tải trọng $Q$, và số xe dùng không vượt
+quá $K$. Lời giải là cách chia khách cho các xe và thứ tự ghé thăm trên từng xe.
+
+Bài toán có ba mục tiêu cùng lúc:
+\begin{itemize}
+  \item $f_1$: tổng chi phí giao hàng (CNY), cần cực tiểu;
+  \item $f_2$: tổng lượng khí thải CO\textsubscript{2} (kg), cần cực tiểu;
+  \item $f_3$: mức hài lòng trung bình của khách, trong đoạn $[0,1]$, cần cực đại.
+\end{itemize}
+Ba mục tiêu này xung đột nhau. Dùng thêm xe giúp đến đúng giờ hơn (tăng $f_3$, giảm phạt trễ trong $f_1$)
+nhưng làm tăng chi phí cố định và quãng đường (tăng $f_2$). Vì vậy kết quả không phải một lời giải duy
+nhất mà là một tập lời giải không trội nhau, gọi là tập Pareto.
+
+\subsection{Ba hàm mục tiêu}
+
+Các tham số được lấy theo bảng 2 của bài báo gốc và ghi trong \code{config.yaml}.
+
+\paragraph{Chi phí $f_1$.} Gồm bốn thành phần:
+\begin{equation}
+  f_1 = F_1 + F_2 + F_3 + F_4 .
+\end{equation}
+$F_1 = \sigma_1 \cdot \text{Fuel}$ là tiền nhiên liệu, với $\sigma_1 = 10$ CNY/lít. Suất tiêu thụ trên
+một chặng phụ thuộc tải hiện có trên xe trước khi giao cho khách tiếp theo:
+\begin{equation}
+  \rho(L) = \rho_0 + \frac{\rho^* - \rho_0}{Q}\, L ,
+  \qquad \rho_0 = 0{,}122 \text{ L/km},\; \rho^* = 0{,}388 \text{ L/km},
+\end{equation}
+nên lượng nhiên liệu của chặng dài $d$ là $d\cdot\rho(L)$. $F_2 = \sigma_2 m$ là chi phí cố định cho
+$m$ xe được dùng ($\sigma_2 = 100$ CNY/xe). $F_3 = \sigma_3 \sum d$ là chi phí theo quãng đường
+($\sigma_3 = 2$ CNY/km). $F_4$ là tiền phạt lệch khung kỳ vọng:
+\begin{equation}
+  F_4 = \frac{\alpha \sum_i \max(ETa_i - t_i, 0) + \beta \sum_i \max(t_i - LTb_i, 0)}{60},
+\end{equation}
+với $t_i$ là giờ xe đến khách $i$ tính bằng phút, $\alpha = 20$ CNY/giờ cho đến sớm, $\beta = 60$
+CNY/giờ cho đến muộn. Phép chia cho 60 đổi số phút sang giờ.
+
+\paragraph{Khí thải $f_2$.} Theo mô hình MEET, với vận tốc không đổi $v = 40$ km/h:
+\begin{equation}
+  f_2 = \frac{\varphi(v)\,\psi(v)}{1000} \sum d, \qquad
+  \varphi(v) = c_0 + c_1 v^3 + \frac{c_2}{v}, \qquad
+  \psi(v) = d_0 + d_1 v + d_2 v^2 + \frac{d_3}{v}.
+\end{equation}
+Bài báo in số hạng $d_2 v^3$ khiến $\psi$ âm ở $v = 40$; nhóm sửa thành $d_2 v^2$, khi đó mỗi km thải
+khoảng $679{,}44$ g CO\textsubscript{2}. Hệ quả quan trọng là $f_2$ tỉ lệ thuận với tổng quãng đường,
+nên $f_2$ và thành phần $F_3$ của $f_1$ biến thiên cùng chiều.
+
+\paragraph{Mức hài lòng $f_3$.} Mỗi khách có hàm hài lòng hình thang $W_i(t)$, thang 0--100:
+\begin{equation}
+  W_i(t) =
+  \begin{cases}
+    0 & t < ET_i \text{ hoặc } t > LT_i,\\[2pt]
+    100\,\dfrac{t - ET_i}{ETa_i - ET_i} & ET_i \le t < ETa_i,\\[6pt]
+    100 & ETa_i \le t \le LTb_i,\\[2pt]
+    100\,\dfrac{LT_i - t}{LT_i - LTb_i} & LTb_i < t \le LT_i,
+  \end{cases}
+  \qquad
+  f_3 = \frac{1}{n}\sum_{i=1}^{n} \frac{W_i(t_i)}{100}.
+\end{equation}
+Nhóm tính $W$ tại giờ xe đến (\code{satisfaction\_time: arrival}). Xe đến sớm thì chờ tới $ETa_i$ rồi
+mới dỡ hàng.
+
+\subsection{Dữ liệu}
+
+Nhóm dùng bộ Solomon~\cite{solomon1987} (bản 100 khách, lấy $n$ khách đầu cho các cỡ 25 và 50), tải trọng $Q = 400$ kg,
+đội xe tối đa $K = 25$, khung chấp nhận được là khung gốc nới thêm 30 phút mỗi đầu. Ngoài ra có bộ dữ
+liệu thực tế 29 khách (\code{case29}) từ bảng 8 của bài báo, tải trọng 4000 kg, chưa giới hạn số xe.
+Phần việc của TV2 thực nghiệm trên bốn instance đại diện: C102-25 (khách phân cụm, khung hẹp), R201-50
+(phân bố ngẫu nhiên, khung rộng), RC201-100 (hỗn hợp, cỡ lớn) và case29-29 (dữ liệu thực tế).
+
+\section{Mã hoá lời giải và bộ giải mã}
+\label{sec:decoder}
+
+Một cá thể là một hoán vị $\pi$ của các khách $1,\dots,n$, không chứa kho. Bộ giải mã (\code{decoder.py})
+cắt hoán vị thành các tuyến theo đúng thứ tự trong hoán vị. Nhóm dùng quy tắc cắt
+\code{capacity\_time}: đi dọc hoán vị, mở tuyến mới khi khách tiếp theo làm xe vượt tải, hoặc khi xe sẽ
+đến khách tiếp theo sau $LT$ mà đội xe vẫn còn xe trống. Sau khi cắt, bộ giải mã đi dọc từng tuyến, tính
+giờ đến, tải, quãng đường rồi ra $(f_1, f_2, f_3)$ cùng các thông tin phụ như danh sách tuyến, số xe và
+cờ \code{fleet\_ok} cho biết số xe có vượt $K$ hay không.
+
+Cách mã hoá này luôn cho lời giải hợp lệ về tải, nhưng có một hệ quả mà phần tìm kiếm cục bộ phải xử lý:
+chỗ cắt tuyến phụ thuộc vào toàn bộ thứ tự trong hoán vị. Đổi thứ tự khách bên trong một tuyến có thể
+làm chỗ cắt dịch đi, tức bộ giải mã tạo ra một bộ tuyến khác (mục~\ref{sec:drift}).
+
+\section{Thuật toán NSGA-II của nhóm}
+
+TV1 cài đặt NSGA-II gốc trong \code{src/nsga2.py}. Quần thể có $N_{pop} = 80$ cá thể, chạy $G = 200$
+thế hệ. Mỗi thế hệ: chọn cha mẹ bằng giải đấu nhị phân theo hạng và khoảng cách đông đúc, lai ghép thứ
+tự (OX) với xác suất $p_c = 0{,}7$, đột biến đảo đoạn hoặc hoán đổi hai vị trí với xác suất
+$p_m = 0{,}1$ (Solomon) hoặc $0{,}2$ (case29), đánh giá con, gộp cha mẹ với con rồi chọn lọc môi trường
+theo front và khoảng cách đông đúc, có loại các hoán vị trùng nhau. Ràng buộc số xe được xử lý bằng trội
+có ràng buộc: lời giải vượt ít xe hơn luôn thắng. Toàn bộ thuật toán dùng một bộ sinh số ngẫu nhiên
+\code{np.random.default\_rng(seed)} duy nhất, nên cùng seed luôn cho cùng kết quả.
+
+\section{Bốn cải tiến và nhiệm vụ của TV2}
+
+\begin{table}[H]
+\centering
+\caption{Bốn cải tiến của nhóm và người phụ trách}
+\label{tab:caitien}
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\textbf{Cải tiến} & \textbf{Ý tưởng} & \textbf{Người làm} \\
+\midrule
+\code{init\_smart}   & khởi tạo quần thể bằng láng giềng gần nhất, sắp theo khung giờ và ngẫu nhiên & TV2 \\
+\code{local\_search} & 2-opt và Or-opt trên từng tuyến sau đột biến & TV2 \\
+\code{diversity}     & SDE hoặc mật độ kNN thay khoảng cách đông đúc, thêm kho lưu trữ ngoài & TV3 \\
+\code{dp\_split}, \code{adaptive\_rates} & cắt tuyến tối ưu bằng quy hoạch động; $p_c$, $p_m$ thích nghi & TV4 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Theo phân công trong README của nhóm, TV2 phải làm các việc sau.
+\begin{enumerate}
+  \item \textbf{Giai đoạn 2 (12/11--18/11).} Cài đặt \code{init\_smart} và \code{local\_search}, mỗi cải
+        tiến một tệp trong \code{src/improvements/}, bật tắt bằng một cờ trong \code{config.yaml}, mặc định
+        tắt. Viết test riêng. Chứng minh khi tắt cờ thì ra đúng kết quả của thuật toán gốc với cùng seed.
+        Chạy 10 seed trên ít nhất 3 instance và so HV với thuật toán gốc.
+  \item \textbf{Giai đoạn 3 (19/11--25/11).} Hỗ trợ ghép các nhánh, chuẩn bị mốc hồi quy: tắt hết cờ phải
+        ra đúng từng con số như thuật toán gốc.
+  \item \textbf{Giai đoạn 4 (26/11--02/12).} Vẽ biểu đồ: front Pareto ba chiều, đường hội tụ HV, biểu đồ
+        hộp HV và IGD qua 10 seed.
+\end{enumerate}
+
+Ngoài ra có bốn quy tắc chung bắt buộc cho mọi cải tiến: (i) cờ tắt thì code cải tiến không được gọi
+bộ sinh số ngẫu nhiên lần nào, (ii) chỉ dùng bộ sinh do \code{nsga2.run} truyền vào, (iii) mọi tham số
+đặt trong \code{config.yaml} dưới mục \code{improvements}, (iv) mọi lần đánh giá thêm phải được cộng vào
+số lần đánh giá \code{n\_evals}, để so sánh giữa các cấu hình được công bằng.
+
+Riêng với tìm kiếm cục bộ, README nêu sẵn một điểm phải cẩn thận: sau khi cải thiện một tuyến rồi nối
+các tuyến lại thành hoán vị, bộ giải mã cắt lại có thể ra bộ tuyến khác, khiến phần cải thiện bị mất
+hoặc bị tính sai. Chương~\ref{chap:ls} trình bày cách xử lý điểm này.

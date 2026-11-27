@@ -1,0 +1,39 @@
+\chapter*{DANH MỤC TỪ VIẾT TẮT VÀ KÝ HIỆU}
+\addcontentsline{toc}{chapter}{Danh mục từ viết tắt và ký hiệu}
+
+\begin{longtable}{@{}p{3.2cm}p{11.3cm}@{}}
+\toprule
+\textbf{Viết tắt} & \textbf{Ý nghĩa} \\
+\midrule
+\endhead
+MOGVRPTW & Multi-Objective Green Vehicle Routing Problem with Time Windows: bài toán định tuyến xe xanh
+           đa mục tiêu có khung thời gian \\
+NSGA-II  & Non-dominated Sorting Genetic Algorithm II: giải thuật di truyền sắp xếp không trội, phiên bản 2 \\
+NN       & Nearest Neighbor: láng giềng gần nhất \\
+TW       & Time Window: khung thời gian; trong báo cáo dùng để chỉ cách khởi tạo theo thứ tự khung giờ \\
+LS       & Local Search: tìm kiếm cục bộ \\
+OX       & Order Crossover: lai ghép thứ tự \\
+DP       & Dynamic Programming: quy hoạch động (cách cắt tuyến tối ưu của TV4) \\
+HV       & Hypervolume: thể tích vùng bị trội \\
+IGD      & Inverted Generational Distance: khoảng cách thế hệ đảo \\
+SP       & Spacing: độ đều của tập nghiệm \\
+SC       & Set Coverage: độ phủ tập \\
+RNG      & Random Number Generator: bộ sinh số ngẫu nhiên \\
+TV1--TV4 & Thành viên 1 đến thành viên 4 của nhóm \\
+\midrule
+\textbf{Ký hiệu} & \textbf{Ý nghĩa} \\
+\midrule
+$n$                     & số khách hàng (không tính kho, kho có chỉ số 0) \\
+$\pi$                   & hoán vị khách hàng, là nhiễm sắc thể của một cá thể \\
+$Q$                     & tải trọng tối đa của một xe (kg) \\
+$K$                     & số xe tối đa của đội xe (\code{fleet\_size}) \\
+$d_{ij}$                & khoảng cách Euclid giữa điểm $i$ và $j$ (km) \\
+$[ET_i, LT_i]$          & khung thời gian chấp nhận được của khách $i$ \\
+$[ETa_i, LTb_i]$        & khung thời gian kỳ vọng của khách $i$, nằm bên trong $[ET_i, LT_i]$ \\
+$f_1, f_2, f_3$         & chi phí (CNY), khí thải CO\textsubscript{2} (kg), mức hài lòng trung bình (0--1) \\
+$\mathbf{g}$            & vectơ mục tiêu cực tiểu hoá $(f_1, f_2, 1-f_3)$ \\
+$N_{pop}$, $G$          & kích thước quần thể, số thế hệ \\
+$p_c$, $p_m$, $p_{ls}$  & xác suất lai ghép, đột biến, chạy tìm kiếm cục bộ \\
+$\mathbf{w}$, $\mathbf{s}$ & vectơ trọng số và vectơ hệ số chuẩn hoá trong tiêu chí tổng có trọng số \\
+\bottomrule
+\end{longtable}
