@@ -19,7 +19,7 @@ V2_FIXED = [AP + "pc_min=0.7", AP + "pc_max=0.7", AP + "pm_min=0.1", AP + "pm_ma
 STATIC = {
     "baseline": [],
     "baseline_g300": ["nsga2.n_gen=300"],   # đối chứng: baseline với ~1.5x thế hệ, cùng cỡ chi phí với polish
-    "dp_every_eval": ["improvements.dp_split=true"],
+    "dp_every_eval": ["improvements.dp_split=true", DPP + "mode=every_eval"],
     "dp_polish_k10": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
     "dp_polish_k30": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=30"],
     "adapt_v1": ["improvements.adaptive_rates=true", *V1_RANGES],

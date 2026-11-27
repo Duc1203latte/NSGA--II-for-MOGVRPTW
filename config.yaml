@@ -126,8 +126,10 @@ improvements:
   dp_split_params:
     weight_dist: dirichlet    # phan phoi trong so moi ca the: dirichlet | onehot (sample_weights)
     weight_inherit: fresh     # trong so cua con: fresh (boc moi) | parent (chep cua mot cha me) (child_weights)
-    mode: every_eval          # every_eval: moi lan cham dung evaluate_dp voi trong so cua ca the (mac dinh)
-                              # polish: tien hoa dung split cua baseline, chi sau the he cuoi moi chay DP
+    mode: polish              # polish (MAC DINH): tien hoa dung split cua baseline, chi sau the he cuoi moi chay DP
+                              #   voi polish_k trong so co dinh (khuyen nghi cua docs/tv4_results.md "Recommendations")
+                              # every_eval: moi lan cham dung evaluate_dp voi trong so cua ca the. Cham 9-20 lan CPU
+                              #   cua baseline, CHI GIU DE THI NGHIEM (tv4_main/tv4_tune), khong dung lam mac dinh
     polish_k: 10              # polish: so vector trong so (luoi simplex tat dinh) cho moi hoan vi cuoi
     g3_scale: 1.0             # he so chuan hoa g3 (g3 da nam trong [0,1]); f1, f2 lay trung binh tren 3 hoan vi cham bang decoder.split()
 
