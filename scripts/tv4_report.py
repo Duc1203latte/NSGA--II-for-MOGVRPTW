@@ -216,6 +216,8 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
     by_cfg = {r["config"]: r for r in rows}
     for r in rows:
         q = partner.get(r["config"])
+        if q is None and r["config"].endswith("_polish"):   # polish kiểu tv4_tune_div: <cấu hình>_polish so với <cấu hình>
+            q = r["config"][: -len("_polish")]
         if q not in by_cfg:
             continue
         a = per_run[per_run.config == r["config"]].sort_values("seed")
@@ -243,6 +245,12 @@ TUNE_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("HV", "HV"), 
              ("feas_front", "Khả thi (front)"), ("front_size", "Số điểm front")]
 
 
+DIV_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("HV", "HV"), ("dHV", "ΔHV vs baseline"),
+            ("p_HV", "p (HV)"), ("IGD", "IGD"), ("p_IGD", "p (IGD)"), ("SP", "SP"), ("front_size", "Số điểm front"),
+            ("cpu_rel", "CPU so với baseline"), ("pair_dHV", "ΔHV so với bản chưa polish (cặp)"),
+            ("pair_p_HV", "p (HV), signed-rank")]
+
+
 POLISH_COLS = [("instance", "Instance"), ("config", "Cấu hình"), ("n_gen", "n_gen"), ("HV", "HV"),
                ("pair_dHV", "ΔHV so với bản chưa polish (cặp)"), ("pair_p_HV", "p (HV), signed-rank"),
                ("IGD", "IGD"), ("pair_dIGD", "ΔIGD so với bản chưa polish (cặp)"),
@@ -265,12 +273,12 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     ap.add_argument("--exclude", nargs="*", default=[], help="bỏ cấu hình khỏi reference set (kiểm lại bảng cũ)")
     ap.add_argument("--order", nargs="*", default=None, help="thứ tự cấu hình trong bảng")
-    ap.add_argument("--cols", choices=["full", "tune", "polish"], default="full")
+    ap.add_argument("--cols", choices=["full", "tune", "polish", "div"], default="full")
     args = ap.parse_args()
     rows = [r for inst in args.instances
             for r in instance_rows(args.exp, inst, tuple(args.exclude), args.order)]
     n_runs = sorted({r["n_runs"] for r in rows})
-    cols = {"tune": TUNE_COLS, "polish": POLISH_COLS}.get(args.cols)
+    cols = {"tune": TUNE_COLS, "polish": POLISH_COLS, "div": DIV_COLS}.get(args.cols)
     text = (to_markdown(rows, cols) + "\n\n"
             f"Mỗi ô: trung bình ± độ lệch chuẩn qua {n_runs} run (cùng bộ seed cho mọi cấu hình). "
             "p-value: Wilcoxon rank-sum hai phía so với baseline cùng instance; chưa hiệu chỉnh đa so sánh.\n\n"

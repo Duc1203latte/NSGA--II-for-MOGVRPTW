@@ -126,3 +126,15 @@ def test_flag_on_runs(setup, density, archive):
         assert all(sorted(p) == list(range(1, inst.n + 1)) for p in a["pop"])
     else:
         assert len(a["pop"]) == cfg["nsga2"]["n_pop"]
+
+
+@pytest.mark.parametrize("density", ["knn", "sde"])
+@pytest.mark.parametrize("k", [3, 5])
+def test_truncate_fewer_neighbors_than_k(density, k):
+    """k >= 3 và chỉ còn 1-2 chỗ trống (ít hơn k láng giềng): không được lỗi (trước đây lexsort rỗng), tất định,
+    và với k = 1 kết quả không đổi."""
+    rng = np.random.default_rng(0)
+    F = rng.random((8, 3))
+    for n_keep in (1, 2, 3):
+        a, b = truncate(F, n_keep, density, k), truncate(F, n_keep, density, k)
+        assert len(a) == n_keep and np.array_equal(a, b) and len(set(a.tolist())) == n_keep
