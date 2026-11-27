@@ -39,7 +39,23 @@ def test_normalization_matters():
 
 def test_density_small_sets():
     assert np.isinf(density_score(np.array([[1.0, 2.0]]), "sde", 1)).all()
-    assert np.isinf(density_score(F3, "knn", 3)).all()      # ít hơn k + 1 điểm
+    # ít hơn k + 1 điểm: dùng láng giềng xa nhất còn có (ở đây là thứ 2), không trả inf hết
+    for k in (3, 5):
+        assert np.allclose(density_score(F3, "knn", k), density_score(F3, "knn", 2))
+
+@pytest.mark.parametrize("method", ["knn", "sde"])
+@pytest.mark.parametrize("k", [1, 2, 3, 4, 10])
+def test_truncate_any_k(method, k):
+    # Lỗi cũ: k >= 3 và cắt xuống ít hơn k - 1 điểm thì lexsort nhận mảng rỗng
+    F = np.random.default_rng(0).random((10, 3))
+    for n_keep in range(0, 11):
+        keep = truncate(F, n_keep, method, k)
+        assert len(keep) == n_keep and len(set(keep.tolist())) == n_keep
+
+def test_truncate_k_above_size_still_drops_crowded():
+    # 3 điểm, k = 3: chỉ có 2 láng giềng nên dùng láng giềng thứ 2; cặp gần nhau vẫn mất một điểm
+    F = np.array([[0, 1], [0.5, 0.5], [0.51, 0.49]], dtype=float)
+    assert truncate(F, 2, "knn", 3).tolist() in ([0, 1], [0, 2])
 
 def test_truncate_removes_crowded():
     # 1 và 2 gần như trùng nhau: phải bỏ một trong hai trước

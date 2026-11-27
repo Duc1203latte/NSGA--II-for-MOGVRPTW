@@ -38,11 +38,18 @@ def distance_matrix(F: np.ndarray, method: str) -> np.ndarray:
     np.fill_diagonal(D, np.inf)
     return D
 
+def kth_index(m: int, k: int) -> int:
+    """Chỉ số (0-based) của láng giềng thứ k trong một hàng đã sắp của m điểm.
+    Mỗi điểm chỉ có m - 1 láng giềng (đường chéo là inf), nên khi m <= k thì dùng láng giềng xa
+    nhất còn có. Không kẹp lại thì cột lấy ra toàn inf (m = k) hoặc rỗng (m < k)."""
+    return min(k, m - 1) - 1
+
 def kth_distance(D: np.ndarray, k: int) -> np.ndarray:
     m = len(D)
-    if m <= k:
+    if m <= 1:
         return np.full(m, np.inf)
-    return np.partition(D, k - 1, axis=1)[:, k - 1]
+    j = kth_index(m, k)
+    return np.partition(D, j, axis=1)[:, j]
 
 def density_score(F: np.ndarray, method: str, k: int) -> np.ndarray:
     """Điểm thưa của từng cá thể, lớn hơn là tốt hơn (thay crowding distance)."""
@@ -57,9 +64,12 @@ def truncate(F: np.ndarray, n_keep: int, method: str, k: int) -> np.ndarray:
     alive = np.arange(len(F))
     if n_keep >= len(F):
         return alive
+    if n_keep <= 0:
+        return alive[:0]
     D = distance_matrix(F, method)
-    while len(alive) > n_keep:
-        sub = np.sort(D[np.ix_(alive, alive)], axis=1)[:, k - 1:]   # láng giềng thứ k trở đi
+    while len(alive) > n_keep:                                       # ở đây len(alive) >= 2
+        j = kth_index(len(alive), k)
+        sub = np.sort(D[np.ix_(alive, alive)], axis=1)[:, j:-1]      # láng giềng thứ k trở đi, bỏ cột inf
         worst = np.lexsort(sub.T[::-1])[0]                          # nhỏ nhất theo thứ tự từ điển
         alive = np.delete(alive, worst)
     return alive
