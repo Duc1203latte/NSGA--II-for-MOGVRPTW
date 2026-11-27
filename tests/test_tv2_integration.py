@@ -184,6 +184,9 @@ def real_cfg(n_gen, n_pop, **flags):
     c["nsga2"]["n_gen"], c["nsga2"]["n_pop"] = n_gen, n_pop
     for f in FLAGS5:
         c["improvements"][f] = flags.get(f, False)
+    # config.yaml mặc định dp_split mode = polish (TV4, giai đoạn 4); các test này kiểm đường every_eval
+    # (W thẳng hàng với pop, F == evaluate_dp chấm lại), nên đặt rõ every_eval.
+    c["improvements"]["dp_split_params"]["mode"] = flags.get("dp_mode", "every_eval")
     return c
 
 

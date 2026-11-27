@@ -63,6 +63,8 @@ def front_vehicles(res: dict, inst, cfg: dict) -> float:
     Đồng thời kiểm lại F đã lưu: lệch thì báo lỗi."""
     use_dp = cfg["improvements"]["dp_split"]
     scales = objective_scales(inst, cfg["improvements"]["dp_split_params"]["g3_scale"]) if use_dp else None
+    if use_dp and cfg["improvements"]["dp_split_params"].get("mode", "every_eval") == "every_eval" and res.get("W") is None:
+        return float("nan")   # every_eval + archive (TV3) không giữ trọng số của cá thể, nên không chấm lại được
     counts = []
     for i in res["front"]:
         perm = res["pop"][i]
@@ -190,7 +192,7 @@ def instance_rows(exp: str, inst_name: str, exclude: tuple[str, ...] = (),
             "n_evals": f"{pr.n_evals.mean():.0f}", "runtime_s": f"{pr.runtime_s.mean():.1f}",
             "feas_front": f"{np.mean([r['feasible_frac_front'] for r in runs]):.2f}",
             "feas_pop": f"{np.mean([r['feasible_frac_pop'] for r in runs]):.2f}",
-            "vehicles": f"{np.mean([front_vehicles(r, inst, cfg) for r in runs]):.1f}",
+            "vehicles": (lambda v: "—" if np.isnan(v) else f"{v:.1f}")(np.mean([front_vehicles(r, inst, cfg) for r in runs])),
             "front_size": f"{pr.n_points.mean():.1f}",
             "n_dp_calls": f"{np.mean([r.get('n_dp_calls', 0) for r in runs]):.0f}",
             "cpu_rel": "—",

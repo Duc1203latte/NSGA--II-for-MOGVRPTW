@@ -19,6 +19,19 @@ V2_FIXED = [AP + "pc_min=0.7", AP + "pc_max=0.7", AP + "pm_min=0.1", AP + "pm_ma
 STATIC = {
     "baseline": [],
     "baseline_g300": ["nsga2.n_gen=300"],   # đối chứng: baseline với ~1.5x thế hệ, cùng cỡ chi phí với polish
+    # --- tv4_combo: tuong tac cac cai tien (init_smart, local_search cua TV2; diversity sde k=1 cua TV3; dp_split cua TV4)
+    "ls": ["improvements.local_search=true"],
+    "polish": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
+    "ls_polish": ["improvements.local_search=true", "improvements.dp_split=true", DPP + "mode=polish",
+                  DPP + "polish_k=10"],
+    "init_ls": ["improvements.init_smart=true", "improvements.local_search=true"],
+    "all_on": ["improvements.init_smart=true", "improvements.local_search=true", "improvements.diversity=true",
+               "improvements.diversity_params.density=sde", "improvements.diversity_params.k=1",
+               "improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
+    "all_on_every_eval": ["improvements.init_smart=true", "improvements.local_search=true",
+                          "improvements.diversity=true", "improvements.diversity_params.density=sde",
+                          "improvements.diversity_params.k=1", "improvements.dp_split=true",
+                          DPP + "mode=every_eval"],
     "dp_every_eval": ["improvements.dp_split=true", DPP + "mode=every_eval"],
     "dp_polish_k10": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=10"],
     "dp_polish_k30": ["improvements.dp_split=true", DPP + "mode=polish", DPP + "polish_k=30"],
