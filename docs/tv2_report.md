@@ -1,5 +1,8 @@
 # Báo cáo TV2: khởi tạo thông minh và local search
 
+> **Cập nhật 27/11:** hook TV2 đã gắn vào `src/nsga2.py` thật sau khi merge `main`. Các số liệu dưới
+> đây VẪN là của harness tạm, chưa chạy lại trên baseline thật.
+
 Branch `feat/tv2-init-local-search`, tách từ `origin/main` `5197d65`. Chưa merge vào `main`.
 
 > **Phạm vi của các số liệu dưới đây.** `src/nsga2.py`, `src/metrics.py`, `src/runner.py` của TV1

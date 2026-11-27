@@ -1,5 +1,10 @@
 # TV2: hợp đồng giao diện `init_smart` và `local_search`
 
+> **Cập nhật 27/11:** đã merge `main` (có `src/nsga2.py` thật của TV1, TV3, TV4). Hook TV2 đã gắn vào
+> `src/nsga2.py`: `init_smart` ở bước khởi tạo, `local_search_children` sau đột biến và trọng số DP,
+> trước khi chấm con. Cờ tắt vẫn khớp từng bit mốc `tests/fixtures/tv4_alloff_main.json`. Mục 1 và 3
+> bên dưới mô tả trạng thái trước khi merge.
+
 Dành cho TV1 (chủ `src/nsga2.py`), TV3, TV4. Hai cải tiến, hai cờ trong `config.yaml`, mặc định tắt.
 Branch: `feat/tv2-init-local-search`, tách từ `origin/main` tại `5197d65` (12/11/2026).
 

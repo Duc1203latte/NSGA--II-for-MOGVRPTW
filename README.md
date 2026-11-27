@@ -17,6 +17,10 @@ Bài báo là nguồn mô hình, tham số, dữ liệu và là mốc để so s
 thức sai và nhiều chỗ không nói rõ, nên nhóm không cố tái tạo đúng số của họ. Code được kiểm bằng test
 tính tay theo mô hình của nhóm. Chỗ nào số lệch bài báo thì ghi vào báo cáo kèm nguyên nhân.
 
+Nhóm cũng không bắt buộc dùng đúng phương pháp của bài báo (cách mã hoá, toán tử lai ghép, đột biến,
+chọn lọc...). Mỗi lựa chọn được quyết định bằng lý do hợp lý hoặc bằng thực nghiệm, cách nào cho kết
+quả tốt hơn thì dùng. Chỗ nào khác bài báo thì ghi rõ khác ở đâu và vì sao.
+
 ## Bài toán
 
 Một kho, một đội xe tải giống nhau, n khách. Mỗi khách có toạ độ, lượng hàng cần giao, thời gian dỡ
@@ -34,7 +38,7 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 | Giai đoạn | Thời gian | Nội dung | Số người | Trạng thái |
 |---|---|---|---|---|
 | 0 | 3/11 – 4/11 | Cấu trúc repo, môi trường, dữ liệu, data loader, decoder | 1 | xong |
-| 1 | 5/11 – 11/11 | Test decoder, NSGA-II baseline, bộ đo | 1 | |
+| 1 | 5/11 – 11/11 | Test decoder, NSGA-II baseline, bộ đo | 1 | xong (13/11) |
 | 2 | 12/11 – 18/11 | Bốn nhánh cải tiến | 3 | |
 | 3 | 19/11 – 25/11 | Merge, ablation, tuning | 3 | |
 | 4 | 26/11 – 2/12 | Chạy đầy đủ, báo cáo, slide | 4 | |
@@ -60,22 +64,29 @@ Ba mục tiêu này xung đột nhau nên đầu ra không phải một lời gi
 
 Mục tiêu: có một NSGA-II gốc chạy đúng và bộ đo đầy đủ, làm nền cho ba người làm cải tiến ở giai đoạn 2.
 
-- [ ] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
+- [x] `tests/test_decoder.py`: test tính tay từng thành phần (hàm hài lòng, split, F1–F4, f2, f3) và
       test bất biến (mỗi khách đúng một lần, không vượt tải)
-- [ ] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
+- [x] Đối chiếu ba bộ tuyến mẫu với số bài báo, ghi lại chỗ lệch
 - [x] Chốt tải trọng Solomon 400 kg và cách cắt tuyến `capacity_time` (12/11)
-- [ ] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
+- [x] `src/nsga2.py`: sắp xếp không trội, crowding distance, chọn lọc giải đấu, lai ghép, đột biến,
       vòng lặp chính. Chỉ dùng một bộ sinh ngẫu nhiên có seed
-- [ ] `src/metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
-- [ ] `src/runner.py`: chạy 10 seed trên một cấu hình, lưu kết quả thô vào `results/`
-- [ ] Gõ số liệu so sánh của bài báo vào `data/paper/paper_metrics.csv`, `data/paper/paper_objectives.csv`
-- [ ] Đo hệ số tương quan giữa f1, f2, f3 trên front của baseline
-- [ ] Chạy baseline với cả hai cách tính hài lòng (`satisfaction_time: arrival` và `service_start`),
+- [x] `tests/test_nsga2.py`: test sắp xếp không trội, crowding distance, toán tử, cùng seed ra cùng
+      kết quả
+- [x] So sánh toán tử (OX/OBX, `standard`/`always`) trên 3 instance × 10 seed, chốt mặc định (13/11)
+- [x] Thêm bước loại cá thể trùng, có thí nghiệm so sánh (12/11)
+- [x] `src/metrics.py` và `tests/test_metrics.py`: HV và IGD qua pymoo, tự viết SP, SC, DM
+- [x] `src/runner.py` và `tests/test_runner.py`: chạy nhiều seed, lưu kết quả thô vào `results/`,
+      phân tích ra CSV
+- [x] Số liệu so sánh của bài báo: `data/paper/paper_metrics.csv` (Table 5, 9),
+      `data/paper/paper_objectives.csv` (Table 6, 7, 10)
+- [x] Đo hệ số tương quan giữa f1, f2, f3 trên front của baseline
+- [x] Chạy baseline với cả hai cách tính hài lòng (`satisfaction_time: arrival` và `service_start`),
       lưu kết quả tách thư mục, so front và hệ số tương quan của hai cách
-- [ ] Bàn giao: chốt interface, viết hướng dẫn ngắn cách thêm một cải tiến (cờ trong config, chỗ gắn
+- [x] Bàn giao: chốt interface, viết hướng dẫn ngắn cách thêm một cải tiến (cờ trong config, chỗ gắn
       vào vòng lặp)
 
 Cổng: test decoder pass; baseline hội tụ, tốt hơn hẳn lời giải ngẫu nhiên, ổn định qua 10 seed.
+**Đạt ngày 13/11**, xem mục "Kết quả baseline giai đoạn 1".
 
 ### Giai đoạn 2 (12/11 – 18/11): TV2, TV3, TV4
 
@@ -427,12 +438,294 @@ tiêu, rồi đưa kết quả vào báo cáo. **Kết quả hai cách phải l�
 
 ### Những điểm mô hình chưa xử lý
 
-- **Số xe tối đa** (`fleet_size`) mới chỉ được báo ra qua `fleet_ok`, chưa bị phạt hay chặn. Solomon
-  100 khách vẫn cần 26–27 xe, vượt giới hạn 25 xe. Lý do: với v = 40 km/h, một đơn vị toạ độ Solomon
-  mất 1.5 phút thay vì 1 phút như thiết kế gốc, và nhóm C1 có thời gian dỡ hàng 90 phút mỗi khách.
+- **Số xe tối đa** (`fleet_size`): decoder chỉ báo ra qua `fleet_ok`. NSGA-II xử lý bằng constrained
+  domination (xem mục "NSGA-II baseline" bên dưới). Với hoán vị ngẫu nhiên, Solomon 100 khách thường
+  cần 26–27 xe, vượt giới hạn 25 xe, vì với v = 40 km/h một đơn vị toạ độ Solomon mất 1.5 phút thay vì
+  1 phút như thiết kế gốc, và nhóm C1 có thời gian dỡ hàng 90 phút mỗi khách. Sau 200 thế hệ, NSGA-II
+  tìm được lời giải không vượt 25 xe (chạy thử C102-100, seed 0).
 - **Giờ đóng cửa kho** chưa được mô hình hoá: xe về kho muộn không bị phạt. Với case thực tế thì chưa
   ảnh hưởng (các lời giải mẫu đều về trước 12:00).
 - **Case thực tế** chưa có giới hạn số xe (`case29.fleet_size: null`).
+
+## NSGA-II baseline
+
+Code ở `src/nsga2.py`, test ở `tests/test_nsga2.py`. Các lựa chọn dưới đây chọn theo lý do kỹ thuật,
+không theo bài báo. Chỗ nào chưa chắc thì để chọn được trong config và sẽ so bằng thực nghiệm.
+
+| Thành phần | Nhóm dùng | Bài báo | Lý do |
+|---|---|---|---|
+| Mã hoá | hoán vị khách, decoder cắt tuyến theo `split_rule` | hoán vị có số 0 làm dấu ngăn tuyến | lai ghép và đột biến đơn giản, luôn ra lời giải hợp lệ; số xe do decoder quyết định |
+| Mục tiêu bên trong | (f1, f2, 1 - f3), cả ba cực tiểu | | để so trội cùng một chiều |
+| Khởi tạo | hoán vị ngẫu nhiên | ngẫu nhiên | khởi tạo thông minh là cải tiến `init_smart` |
+| Chọn lọc cha mẹ | giải đấu `tournament_size` = 2: hạng thấp hơn thắng, cùng hạng thì crowding lớn hơn thắng | giống, không ghi kích thước | NSGA-II chuẩn |
+| Lai ghép | `crossover: ox` mặc định, `obx` để so | OBX | OX giữ nguyên một đoạn liền của cha 1, tức giữ được các cụm khách đi liền nhau. OBX giữ vị trí tuyệt đối, ít giữ cặp khách liền kề |
+| Đột biến | `mutation: standard`: với xác suất pm, inversion hoặc swap 50/50. `always` để so | inversion ba điểm hoặc swap | inversion giống một bước 2-opt, chỉ phá 2 cạnh; swap phá 4 cạnh |
+| Số xe tối đa | constrained domination: lời giải vượt ít xe hơn luôn thắng; vượt bằng nhau thì so Pareto | ràng buộc cứng (23) | cách xử lý ràng buộc chuẩn của NSGA-II, không cần chọn hệ số phạt |
+| Chọn lọc môi trường | gộp cha mẹ và con, lấy theo front, front cuối lấy theo crowding | | NSGA-II chuẩn |
+| Loại cá thể trùng | `eliminate_duplicates: true`: khi chọn cá thể sống sót, mỗi hoán vị chỉ giữ một bản; bản sao chỉ dùng để lấp chỗ khi không đủ hoán vị khác nhau | | thí nghiệm bên dưới |
+| Ngẫu nhiên | một bộ sinh `np.random.default_rng(seed)` cho mọi thứ | | cùng seed ra đúng cùng kết quả |
+
+**Về hai chỗ bài báo viết không rõ ở phần đột biến:**
+
+- Bài báo viết: mỗi cá thể bốc số ngẫu nhiên; nhỏ hơn Pm thì inversion, **lớn hơn hoặc bằng Pm thì
+  swap**. Đọc đúng chữ thì đứa con nào cũng bị đột biến. Đây là chế độ `mutation: always`.
+- "Inversion ba điểm" trong Hình 4a không khớp với phép đảo đoạn thông thường. Nhóm dùng phép đảo đoạn
+  thông thường ở cả hai chế độ.
+
+**Chạy thử** (200 thế hệ, 80 cá thể, seed 0, cấu hình mặc định):
+
+| Instance | Thời gian | f1 nhỏ nhất: thế hệ 0 → cuối | f2 nhỏ nhất | f3 lớn nhất |
+|---|---|---|---|---|
+| C102-25 | 2 giây | 3607 → 1707 | 409.7 → 240.9 | 0.543 → 0.952 |
+| case29 | 2 giây | 2834 → 2375 | 288.5 → 219.3 | 0.759 → 0.862 |
+| C102-100 | 6 giây | 67073 → 16857 | 2835.7 → 1952.9 | 0.343 → 0.605 |
+
+Đây mới là một seed, chưa phải kết quả để báo cáo. Bảng này chạy trước khi thêm bước loại cá thể trùng.
+
+### Thí nghiệm: có nên loại cá thể trùng không (12/11)
+
+**Vấn đề.** NSGA-II gốc không loại cá thể trùng. Một lời giải tốt được chọn lặp lại nhiều lần, các bản
+sao chiếm dần quần thể. Đếm ở thế hệ cuối (seed 0): C102-25 chỉ có 18/80 hoán vị khác nhau, case29
+13/80, R201-50 24/80. Quần thể thật chỉ còn khoảng 15–25 cá thể.
+
+**Thí nghiệm.** So `eliminate_duplicates: false` và `true`, 3 instance × 10 seed (0–9), cùng bộ seed,
+cấu hình mặc định còn lại. Reference set và cận chuẩn hoá lấy chung từ cả hai cấu hình. p-value là
+Wilcoxon rank-sum trên 10 giá trị HV.
+
+| Instance | HV không loại | HV loại trùng | p | SC(loại, không loại) | SC(không loại, loại) |
+|---|---|---|---|---|---|
+| C102-25 | 0.261 ± 0.142 | **0.720 ± 0.273** | **0.0007** | 0.900 | 0.094 |
+| R201-50 | 0.671 ± 0.226 | 0.702 ± 0.175 | 0.71 | 0.434 | 0.376 |
+| case29 | 0.744 ± 0.193 | 0.791 ± 0.205 | 0.65 | 0.571 | 0.293 |
+
+**Kết luận.** Loại cá thể trùng tốt hơn rõ rệt trên C102-25 (HV gần gấp 3, có ý nghĩa thống kê, và phủ
+90% front của bản không loại). Trên R201-50 và case29, trung bình tốt hơn nhưng chưa có ý nghĩa thống
+kê. Không instance nào tệ đi. **Chốt: bật `eliminate_duplicates: true` trong baseline.**
+
+**Ghi chú phụ từ thí nghiệm:**
+
+- HV trung bình vẫn còn tăng từ thế hệ 150 đến 200 trên cả ba instance, tức là 200 thế hệ chưa hội tụ
+  hẳn.
+- Front cuối chỉ có khoảng 10–20 điểm khác nhau, dù quần thể có 80 cá thể.
+
+### Thí nghiệm: chọn toán tử lai ghép và đột biến (13/11)
+
+**Thí nghiệm.** 4 cấu hình: lai ghép `ox` hoặc `obx`, kết hợp với đột biến `standard` hoặc `always`.
+Chạy trên 3 instance, mỗi cấu hình 10 seed (0–9), `satisfaction_time: arrival`, có loại cá thể trùng.
+Thí nghiệm `ops_arrival` trong `results/`.
+
+| Instance | `ox_standard` | `ox_always` | `obx_standard` | `obx_always` |
+|---|---|---|---|---|
+| C102-25 | **0.890 ± 0.212** | 0.607 ± 0.190 | 0.542 ± 0.169 | 0.484 ± 0.133 |
+| R201-50 | **0.980 ± 0.148** | 0.562 ± 0.078 | 0.401 ± 0.203 | 0.369 ± 0.042 |
+| case29 | **0.977 ± 0.152** | 0.940 ± 0.084 | 0.881 ± 0.102 | 0.841 ± 0.058 |
+
+(HV trung bình ± độ lệch chuẩn; HV chỉ so được giữa các cấu hình trong cùng một instance.)
+
+p-value rank-sum trên HV, `ox_standard` so với từng cấu hình còn lại:
+
+| Instance | so với `ox_always` | so với `obx_standard` | so với `obx_always` |
+|---|---|---|---|
+| C102-25 | 0.004 | 0.003 | 0.0007 |
+| R201-50 | 0.0002 | 0.0003 | 0.0002 |
+| case29 | 0.41 | 0.07 | 0.010 |
+
+Trên R201-50, front của `ox_standard` phủ 98–100% front của ba cấu hình kia (SC), còn chiều ngược lại
+là 0%.
+
+**Kết luận.**
+
+- **OX tốt hơn OBX** ở mọi instance, đúng như lý do đã nêu: OX giữ nguyên một đoạn liền của cha mẹ, tức
+  giữ được các cụm khách đi liền nhau.
+- **`standard` tốt hơn `always`** (đột biến mọi đứa con như cách đọc đúng chữ bài báo): đột biến quá
+  nhiều làm hỏng lời giải tốt.
+- Khác biệt có ý nghĩa thống kê trên C102-25 và R201-50. Trên case29, `ox_standard` vẫn có HV cao nhất
+  nhưng chỉ khác `obx_always` có ý nghĩa thống kê.
+- **Chốt: giữ mặc định `crossover: ox`, `mutation: standard`.** Đây là chỗ nhóm làm khác bài báo (bài
+  báo dùng OBX và đột biến mọi cá thể), có số liệu để ghi vào báo cáo.
+
+## Chỉ số đánh giá
+
+Code ở `src/metrics.py`, test ở `tests/test_metrics.py`. Mọi tập điểm là mục tiêu cực tiểu
+(f1, f2, 1 - f3), đúng như `nsga2.run` trả về.
+
+| Chỉ số | Ý nghĩa | Tốt khi | Cách tính |
+|---|---|---|---|
+| HV (hypervolume) | thể tích vùng bị front trội, tính tới điểm tham chiếu | lớn, tối đa 1.1³ = 1.331 | pymoo, trên mục tiêu đã chuẩn hoá, điểm tham chiếu (1.1, 1.1, 1.1) |
+| IGD | khoảng cách trung bình từ mỗi điểm của reference set tới điểm gần nhất của front | nhỏ | pymoo, trên mục tiêu đã chuẩn hoá |
+| SP (spacing) | độ lệch chuẩn của khoảng cách từ mỗi điểm tới điểm gần nó nhất, công thức (29) của bài báo | nhỏ (đều) | tự viết, trên mục tiêu đã chuẩn hoá |
+| SC(A, B) (set coverage) | tỉ lệ điểm của B bị ít nhất một điểm của A trội, công thức (31) | SC(A, B) lớn hơn SC(B, A) thì A tốt hơn | tự viết, không cần chuẩn hoá |
+| DM | căn của tổng bình phương độ trải từng mục tiêu, chia cho độ trải của mọi điểm, công thức (32) | lớn (trải rộng), tối đa √3 | tự viết |
+
+**Vì sao HV và IGD dùng pymoo.** HV trong không gian 3 chiều rất dễ viết sai, và sai thì vẫn ra một
+con số trông hợp lý, trong khi toàn bộ phần so sánh của báo cáo dựa trên nó.
+
+**Reference set.** Gộp front cuối của **mọi cấu hình và mọi run** trên cùng một instance, rồi lọc lấy
+phần không bị trội. Phải gộp cả baseline chứ không chỉ bản tốt nhất, nếu không IGD của bản tốt nhất gần
+bằng 0 và vô nghĩa. Hệ quả: **thêm cấu hình mới thì phải tính lại chỉ số của mọi cấu hình cũ**, vì
+reference set đổi. Vì vậy runner lưu front thô, còn chỉ số được tính sau cùng.
+
+**Chuẩn hoá.** Mỗi mục tiêu được đưa về [0, 1] theo min và max của **mọi điểm trong mọi front** (mọi
+cấu hình, mọi run trên cùng instance), không chỉ reference set. Không chuẩn hoá thì f1 (cỡ vài nghìn)
+lấn át hẳn f3 (nhỏ hơn 1) trong mọi phép tính khoảng cách và thể tích.
+
+Lúc đầu nhóm chuẩn hoá theo min-max của reference set, nhưng bỏ cách đó vì hai lỗi thấy trong thí
+nghiệm loại cá thể trùng:
+
+- Reference set chỉ gồm điểm tốt nhất nên nằm trong một vùng hẹp. Front của cấu hình kém hơn nằm hẳn
+  ngoài vùng đó, sau chuẩn hoá vượt điểm tham chiếu 1.1, nên HV = 0. C102-25 không loại trùng ra HV = 0
+  ở cả 10 run, nên không so được gì.
+- DM vượt √3 (lên tới 2.17), trái với định nghĩa. Công thức (32) của bài báo chuẩn hoá theo cực trị của
+  mọi lời giải của mọi thuật toán, đúng như cách nhóm dùng bây giờ.
+
+HV của các thế hệ đầu vẫn có thể bằng 0 vì front lúc đó nằm ngoài cận chuẩn hoá. Đường hội tụ HV vì
+vậy bắt đầu từ 0, và điều này là bình thường.
+
+**Front được làm sạch trước khi tính:** bỏ các điểm trùng nhau và các điểm bị trội. Điểm trùng làm SP
+sai, vì khoảng cách tới điểm gần nhất bằng 0.
+
+**Không so số HV với bài báo.** Bài báo không ghi cách chuẩn hoá và điểm tham chiếu của họ, nên số HV
+hai bên không so trực tiếp được. Chỉ so thứ hạng giữa các cấu hình của nhóm.
+
+## Chạy thí nghiệm
+
+Code ở `src/runner.py`, test ở `tests/test_runner.py`. Có hai bước tách riêng:
+
+1. **`run`**: chạy một cấu hình trên một instance với nhiều seed. Mỗi seed lưu một file kết quả **thô**
+   (quần thể cuối, front, front qua từng thế hệ, số lần đánh giá, thời gian chạy), kèm bản config đã
+   dùng (`config_used.yaml`).
+2. **`analyze`**: đọc mọi cấu hình của một thí nghiệm trên một instance, dựng reference set và cận chuẩn
+   hoá chung, tính chỉ số, so từng cặp cấu hình, rồi xuất CSV.
+
+Hai bước phải tách nhau vì reference set đổi mỗi khi có thêm cấu hình. Thêm cấu hình thì chỉ cần
+`analyze` lại, mất vài giây, không phải chạy lại thuật toán.
+
+```powershell
+# Chạy cấu hình mặc định, 10 seed lấy từ config
+python -m src.runner run --exp ops_arrival --config ox --instance C102 --n 25
+
+# Ghi đè config cho riêng lần chạy này (không sửa config.yaml), dùng --set nhiều lần được
+python -m src.runner run --exp ops_arrival --config obx --instance C102 --n 25 --set nsga2.crossover=obx
+
+# Chỉ chạy vài seed
+python -m src.runner run --exp thu --config ox --instance case29 --n 29 --seeds 0,1,2
+
+# Phân tích: tên instance viết như tên thư mục, ví dụ C102-25, case29-29
+python -m src.runner analyze --exp ops_arrival --instance C102-25
+```
+
+Kết quả nằm ở:
+
+```
+results/<thí nghiệm>/<instance>/<cấu hình>/seed_00.pkl ... seed_09.pkl, config_used.yaml
+results/<thí nghiệm>/<instance>/per_run.csv       chỉ số của từng run
+results/<thí nghiệm>/<instance>/summary.csv       trung bình ± độ lệch chuẩn, tương quan giữa 3 mục tiêu
+results/<thí nghiệm>/<instance>/pairwise.csv      từng cặp cấu hình: HV, p-value rank-sum, SC hai chiều
+results/<thí nghiệm>/<instance>/convergence.csv   HV trung bình qua các thế hệ
+```
+
+**Quy tắc quan trọng: mọi cấu hình trong cùng một thí nghiệm phải giải cùng một bài toán.** Chúng chỉ
+được khác nhau ở phần thuật toán: toán tử, loại trùng, cách cắt tuyến (`split_rule`), các cải tiến.
+Đổi `satisfaction_time`, tham số chi phí, khí thải hay dữ liệu là đổi cách tính mục tiêu, tức đổi bài
+toán, nên kết quả không còn so được với nhau. Những thay đổi đó phải chạy ở **thí nghiệm khác**
+(`--exp` khác). `analyze` sẽ báo lỗi nếu bị trộn.
+
+`split_rule` thuộc về thuật toán chứ không thuộc về bài toán: f1, f2, f3 được tính trên các tuyến, còn
+cách cắt hoán vị thành tuyến chỉ là cách thuật toán tìm ra các tuyến đó. Vì vậy so `capacity` với
+`capacity_time`, hay sau này so `dp_split` với baseline, là hợp lệ.
+
+`run` bỏ qua seed nào đã có file, nên chạy dở bị ngắt thì chạy lại lệnh cũ là được. Muốn chạy lại từ đầu
+thì thêm `--overwrite`.
+
+`results/` không đưa lên git. Mỗi người tự chạy lại từ cùng config và cùng seed sẽ ra cùng kết quả.
+
+### Quan sát đầu tiên: hai cách tính hài lòng trên case thực tế (13/11)
+
+Chạy baseline 10 seed trên case29 với mỗi cách, ở hai thí nghiệm riêng:
+
+| | `arrival` | `service_start` |
+|---|---|---|
+| f3 lớn nhất (các seed) | 0.86–0.90 | **1.0000 ở mọi seed** |
+| Tương quan f1–f2 trên front | 0.931 | 0.764 |
+| Tương quan f1–f3, f2–f3 | 0.577, 0.671 | không tính được: f3 bằng nhau trên cả front |
+| DM (độ trải) | 0.93 ± 0.26 | 0.27 ± 0.18 |
+
+Với `service_start`, f3 trên case thực tế gần như luôn bằng 1.0, nên front gần như chỉ còn hai mục
+tiêu, đúng như rủi ro đã nêu ở phần giả định. Với `arrival`, f1 và f2 tương quan rất mạnh (0.93), khớp
+với lỗi số 2 của bài báo (f2 tỉ lệ với quãng đường). Kết quả đầy đủ ở mục dưới.
+
+## Kết quả baseline giai đoạn 1 (13/11)
+
+**Thiết lập.** NSGA-II baseline với cấu hình mặc định: OX, đột biến `standard`, loại cá thể trùng,
+`split_rule: capacity_time`, 80 cá thể, 200 thế hệ. Chạy 10 instance × 10 seed (0–9), với **mỗi** cách
+tính hài lòng ở một thí nghiệm riêng: `baseline_arrival` và `baseline_service_start` trong `results/`.
+Bảng tổng hợp ở `results/baseline_summary.csv`.
+
+Ghi chú về cột:
+
+- **HV:** trung bình ± độ lệch chuẩn qua 10 seed. HV chuẩn hoá theo các run của chính thí nghiệm đó, nên
+  chỉ dùng để xem độ ổn định, không so giữa các instance.
+- **f1 ngẫu nhiên:** f1 nhỏ nhất của quần thể ban đầu (hoán vị ngẫu nhiên), trung bình 10 seed.
+- **f1, f2, f3 cuối:** giá trị tốt nhất trên front cuối, trung bình 10 seed.
+
+### `satisfaction_time: arrival`
+
+| Instance | HV | HV thế hệ 100 → 200 | f1 ngẫu nhiên → cuối (± std) | f2 cuối | f3 ngẫu nhiên → cuối | Tương quan f1–f2 | Thời gian/run |
+|---|---|---|---|---|---|---|---|
+| C102-25 | 0.55 ± 0.31 | 0.23 → 0.55 | 3804 → 1349 (± 105) | 167.3 | 0.56 → 0.958 | 0.90 | 2 s |
+| R201-25 | 0.86 ± 0.19 | 0.57 → 0.86 | 5133 → 2653 (± 140) | 354.6 | 0.39 → 0.818 | 0.60 | 2 s |
+| RC202-25 | 0.87 ± 0.10 | 0.65 → 0.87 | 5334 → 2384 (± 117) | 306.4 | 0.60 → 0.921 | 0.97 | 2 s |
+| C102-50 | 0.66 ± 0.24 | 0.18 → 0.66 | 9688 → 4125 (± 256) | 527.8 | 0.48 → 0.860 | 0.88 | 3.5 s |
+| R201-50 | 0.78 ± 0.20 | 0.23 → 0.78 | 11146 → 5768 (± 256) | 786.6 | 0.38 → 0.793 | 0.81 | 3.4 s |
+| RC202-50 | 0.80 ± 0.14 | 0.42 → 0.80 | 12626 → 6286 (± 296) | 893.5 | 0.60 → 0.901 | 0.98 | 3.4 s |
+| C102-100 | 0.85 ± 0.25 | 0.27 → 0.85 | 65559 → 15499 (± 1517) | 1970.3 | 0.33 → 0.641 | 0.10 | 6.5 s |
+| R201-100 | 0.91 ± 0.14 | 0.32 → 0.91 | 39287 → 13565 (± 538) | 1731.8 | 0.24 → 0.644 | −0.17 | 6.4 s |
+| RC201-100 | 0.76 ± 0.13 | 0.29 → 0.76 | 45377 → 16338 (± 763) | 2152.5 | 0.26 → 0.674 | 0.54 | 6.4 s |
+| case29 | 0.79 ± 0.21 | 0.44 → 0.79 | 2920 → 2383 (± 46) | 216.7 | 0.79 → 0.883 | 0.93 | 2.4 s |
+
+Không run nào vượt số xe tối đa.
+
+### `satisfaction_time: service_start`
+
+| Instance | HV | f1 cuối | f3 ngẫu nhiên → cuối | Số điểm trên front |
+|---|---|---|---|---|
+| C102-25 | 0.47 ± 0.31 | 1507 | 1.000 → 1.000 | 7.7 |
+| R201-25 | 0.92 ± 0.27 | 2636 | 1.000 → 1.000 | 6.4 |
+| RC202-25 | 0.76 ± 0.54 | 2220 | 1.000 → 1.000 | 3.9 |
+| C102-50 | 0.66 ± 0.37 | 4152 | 1.000 → 1.000 | 5.6 |
+| R201-50 | 0.63 ± 0.32 | 5497 | 1.000 → 1.000 | 7.3 |
+| RC202-50 | 0.57 ± 0.44 | 4987 | 1.000 → 1.000 | 4.6 |
+| C102-100 | 0.84 ± 0.22 | 15585 | 0.680 → 0.990 | 11.9 |
+| R201-100 | 0.91 ± 0.29 | 13092 | 0.728 → 1.000 | 14.8 |
+| RC201-100 | 0.90 ± 0.33 | 15229 | 0.710 → 1.000 | 15.6 |
+| case29 | 0.58 ± 0.42 | 2363 | 1.000 → 1.000 | 5.0 |
+
+### Kiểm tra cổng giai đoạn 1
+
+| Điều kiện | Kết quả |
+|---|---|
+| Test decoder pass | **Đạt.** 87 test, gồm test tính tay và test bất biến |
+| Baseline hội tụ (HV tăng qua các thế hệ) | **Đạt.** HV tăng đều ở cả 20 thí nghiệm. Nhưng **chưa hội tụ hẳn**: HV vẫn tăng mạnh từ thế hệ 150 đến 200 ở mọi instance |
+| Tốt hơn hẳn lời giải ngẫu nhiên | **Đạt.** f1 nhỏ nhất giảm còn 24–82% so với quần thể ngẫu nhiên ban đầu (C102-100: 65559 → 15499); f3 tăng ở mọi instance với `arrival` |
+| Ổn định qua 10 seed | **Đạt ở mức mục tiêu:** độ lệch chuẩn của f1 tốt nhất chỉ 2–10% giá trị trung bình. HV dao động mạnh hơn (độ lệch chuẩn 0.10–0.31) vì front chỉ có 10–30 điểm |
+
+**Kết luận: giai đoạn 1 đạt cổng.**
+
+### Những điều rút ra cho báo cáo và giai đoạn 2
+
+1. **`service_start` làm f3 gần như vô nghĩa.** Với cách cắt tuyến `capacity_time`, ngay cả hoán vị ngẫu
+   nhiên cũng đạt f3 = 1.000 trên 7/10 instance. Front chỉ còn 4–15 điểm và HV dao động rất mạnh. Đề
+   xuất: **dùng `arrival` cho mọi thí nghiệm chính**, còn `service_start` chỉ đưa vào báo cáo như một
+   phân tích độ nhạy. Cần cả nhóm chốt.
+2. **Tương quan f1–f2 phụ thuộc vào phần phạt đến muộn.** Trên 25 và 50 khách, f1 và f2 tương quan rất
+   mạnh (0.60–0.98), đúng như lỗi số 2 của bài báo (f2 tỉ lệ với quãng đường). Trên 100 khách, tương quan
+   gần 0 hoặc âm (C102-100: 0.10, R201-100: −0.17), vì ở đó f1 bị phần phạt đến muộn F4 chi phối, nên
+   không còn đi theo quãng đường.
+3. **200 thế hệ chưa đủ để hội tụ.** Các cải tiến ở giai đoạn 2 sẽ dễ cho thấy hiệu quả, nhưng phải so ở
+   cùng số lần đánh giá chứ không chỉ cùng số thế hệ (xem phần giai đoạn 3).
+4. **So với bài báo** (`data/paper/paper_objectives.csv`, cột NSGA-II): f1 của nhóm thấp hơn nhiều, ví dụ
+   C102-100 là 15499 so với 158598 của họ. Nhưng mô hình hai bên khác nhau (cách cắt tuyến, đơn vị thời
+   gian, các chỗ sửa công thức), nên chỉ đặt cạnh nhau trong báo cáo, không kết luận "tốt hơn bài báo".
 
 ## Bốn cải tiến
 
@@ -445,6 +738,76 @@ tiêu, rồi đưa kết quả vào báo cáo. **Kết quả hai cách phải l�
 
 Mỗi cải tiến bật tắt bằng một cờ trong `config.yaml` và mặc định tắt. Tắt hết cờ thì chương trình
 phải cho đúng kết quả của NSGA-II gốc với cùng seed, để tách được đóng góp của từng cải tiến.
+
+### Hướng dẫn thêm một cải tiến (bàn giao cho TV2, TV3, TV4)
+
+**Những gì đã đóng băng, không được đổi chữ ký:**
+
+```python
+load_instance(name, n, cfg=None) -> Instance          # src/instance.py
+evaluate(perm, inst) -> (f1, f2, f3)                  # src/decoder.py
+evaluate_detail(perm, inst) -> dict                   # src/decoder.py
+evaluate_routes_detail(routes, inst) -> dict          # src/decoder.py, tính thẳng từ bộ tuyến
+nsga2.run(inst, cfg, seed) -> dict                    # src/nsga2.py
+```
+
+Cần thêm thông tin thì thêm trường vào `Instance`, thêm khoá vào kết quả trả về, hoặc viết hàm mới.
+
+**Chỗ gắn từng cải tiến trong code hiện tại:**
+
+| Cải tiến | File riêng | Gắn vào đâu |
+|---|---|---|
+| `init_smart` | `src/improvements/init_smart.py` | `nsga2.run`, dòng tạo quần thể đầu `pop = [rng.permutation(...) ...]`. Cờ bật thì gọi hàm khởi tạo của mình thay cho dòng đó |
+| `local_search` | `src/improvements/local_search.py` | `nsga2.make_offspring`, ngay sau `mutate(c, ...)`, trước khi đưa con vào danh sách |
+| `diversity` | `src/improvements/diversity.py` | `nsga2.rank_and_crowding` (thay crowding distance) và `nsga2.select_survivors`. Archive giữ trong vòng lặp của `run`, trả về thêm trong kết quả |
+| `dp_split` | `src/improvements/dp_split.py` | `decoder.split`: thêm một cách cắt mới. Pc/Pm thích nghi gắn vào `nsga2.make_offspring` và `nsga2.mutate` |
+
+Mẫu gắn một cải tiến, ví dụ `local_search`:
+
+```python
+# trong nsga2.make_offspring
+for c in (c1, c2):
+    mutate(c, pm, p["mutation"], rng)
+    if cfg["improvements"]["local_search"]:
+        c = local_search(c, inst, cfg, rng)      # hàm nằm trong src/improvements/local_search.py
+    children.append(c)
+```
+
+**Bốn quy tắc bắt buộc:**
+
+1. **Cờ tắt thì không đụng tới `rng`.** Mọi lệnh bốc số ngẫu nhiên của cải tiến phải nằm bên trong
+   `if cfg["improvements"][...]`. Bốc thừa dù chỉ một lần thì dãy số phía sau lệch đi, và kết quả không
+   còn giống baseline với cùng seed.
+2. **Chỉ dùng `rng` mà `nsga2.run` truyền vào.** Không tạo `random.Random()` hay
+   `np.random.default_rng()` mới.
+3. **Tham số mới đặt trong `config.yaml`**, dưới mục `improvements`, ví dụ:
+
+   ```yaml
+   improvements:
+     local_search: false
+     local_search_params:
+       p_ls: 0.2
+       max_iter: 50
+   ```
+4. **Mọi đánh giá thêm phải được đếm vào `n_evals`.** `local_search` và `dp_split` gọi decoder nhiều
+   lần hơn baseline; không đếm thì phép so sánh ở giai đoạn 3 không công bằng.
+
+**Kiểm tra trước khi push:**
+
+```powershell
+python -m pytest tests -v                       # mọi test cũ vẫn phải pass
+```
+
+Viết thêm `tests/test_<tên cải tiến>.py`, trong đó có một test so `nsga2.run` với cờ tắt và kết quả
+baseline cùng seed, phải giống hệt nhau.
+
+**Chạy so với baseline:**
+
+```powershell
+python -m src.runner run --exp tv2_ls --config baseline --instance C102 --n 25
+python -m src.runner run --exp tv2_ls --config ls --instance C102 --n 25 --set improvements.local_search=true
+python -m src.runner analyze --exp tv2_ls --instance C102-25
+```
 
 ## Quy ước làm việc
 

@@ -83,6 +83,14 @@ nsga2:
   pm:                         # xác suất đột biến
     solomon: 0.1
     case29: 0.2
+  eliminate_duplicates: true  # loại hoán vị trùng khi chọn cá thể sống sót; bản sao chỉ dùng
+                              # để lấp chỗ khi không đủ hoán vị khác nhau
+  tournament_size: 2          # số cá thể mỗi lượt chọn lọc giải đấu
+  crossover: ox               # ox  : order crossover, giữ nguyên một đoạn liền của cha 1
+                              # obx : order-based crossover như bài báo
+  mutation: standard          # standard : đột biến với xác suất pm, chọn inversion hoặc swap 50/50
+                              # always   : đứa con nào cũng đột biến; xác suất pm dùng inversion,
+                              #            còn lại dùng swap 
 
 experiment:
   n_runs: 10
@@ -117,6 +125,32 @@ improvements:
     split_drift_policy: reject  # split lại hoán vị ghép ra bộ tuyến KHÁC bộ tuyến đề xuất:
                                 #   reject          : loại bước đi (an toàn, đúng nghĩa nội tuyến)
                                 #   evaluate_actual : vẫn so sánh bằng kết quả thật của decoder
+  # Tham số TV3 (chỉ đọc khi diversity bật). Chưa tuning, TV4 chỉnh ở giai đoạn 3.
+  diversity_params:
+    density: sde              # sde : shift-based density (phạt cá thể chỉ giỏi một mục tiêu)
+                              # knn : khoảng cách tới láng giềng gần thứ k
+    k: 1                      # láng giềng thứ k; hoà thì xét tiếp k+1, k+2... như SPEA2
+    archive: true             # true: giữ external archive, kết quả cuối là archive
+    archive_size: 80          # = n_pop, để số điểm trả về ngang baseline (HV không thiên vị)
+  adaptive_rates: false       # Pc/Pm thich nghi theo hang, tach rieng khoi dp_split
+  adaptive_params:
+    pc_min: 0.6               # pc = pc_min + (pc_max - pc_min) * r / R, r = hang tot nhat cua cha me
+    pc_max: 0.9
+    pm_min: 0.05              # khoang pm cho Solomon (pm goc 0.1 nam trong khoang)
+    pm_max: 0.3
+    pm_case29: {min: 0.1, max: 0.4}   # khoang pm rieng cho case29 (pm goc 0.2 nam trong khoang)
+    single_front_threshold: 0.9   # >= ty le nay quan the o front 1 thi dung pc/pm goc (nsga2.pc, nsga2.pm)
+    stagnation_gens: 0        # 0 = tat; front 1 khong doi qua ngan nay generation thi nhan pm them boost
+    boost: 1.5                # he so nhan pm khi tri tre, bi chan o boost_pm_cap
+    boost_pm_cap: null        # tran pm sau boost; null = pm_max. Dat > pm_max khi pm_min = pm_max (pm co dinh)
+  # Tham so cua dp_split (chi dung khi dp_split = true)
+  dp_split_params:
+    weight_dist: dirichlet    # phan phoi trong so moi ca the: dirichlet | onehot (sample_weights)
+    weight_inherit: fresh     # trong so cua con: fresh (boc moi) | parent (chep cua mot cha me) (child_weights)
+    mode: every_eval          # every_eval: moi lan cham dung evaluate_dp voi trong so cua ca the (mac dinh)
+                              # polish: tien hoa dung split cua baseline, chi sau the he cuoi moi chay DP
+    polish_k: 10              # polish: so vector trong so (luoi simplex tat dinh) cho moi hoan vi cuoi
+    g3_scale: 1.0             # he so chuan hoa g3 (g3 da nam trong [0,1]); f1, f2 lay trung binh tren 3 hoan vi cham bang decoder.split()
 
 # ---------------------------------------------------------------------------
 # Chỉ số đánh giá

@@ -170,3 +170,67 @@ def test_ox_and_inversion_keep_permutation():
             c1, c2 = H.ox_crossover(a, b, rng)
             assert is_perm(c1, n) and is_perm(c2, n)
             assert is_perm(H.inversion_mutation(a, rng), n)
+
+
+# ================================================================== NSGA-II thật (src/nsga2.py)
+from src import nsga2  # noqa: E402
+from src.improvements import tv2_hooks  # noqa: E402
+
+FLAGS5 = ("init_smart", "local_search", "diversity", "dp_split", "adaptive_rates")
+
+
+def real_cfg(n_gen, n_pop, **flags):
+    c = copy.deepcopy(load_config())
+    c["nsga2"]["n_gen"], c["nsga2"]["n_pop"] = n_gen, n_pop
+    for f in FLAGS5:
+        c["improvements"][f] = flags.get(f, False)
+    return c
+
+
+def test_real_flags_off_never_calls_tv2(monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("code TV2 bị gọi khi cờ tắt")
+    monkeypatch.setattr(tv2_hooks, "smart_initial_population", boom)
+    monkeypatch.setattr(tv2_hooks.LocalSearchHook, "__init__", boom)
+    c = real_cfg(3, 12)
+    r = nsga2.run(load_instance("C102", 25, c), c, 0)
+    assert r["init_sources"] is None and r["ls_counters"] is None
+
+
+REAL = {
+    "init_only": {"init_smart": True},
+    "ls_only": {"local_search": True},
+    "both": {"init_smart": True, "local_search": True},
+    "both_diversity": {"init_smart": True, "local_search": True, "diversity": True},
+    "ls_dp": {"local_search": True, "dp_split": True},
+    "both_dp_adaptive": {"init_smart": True, "local_search": True, "dp_split": True,
+                         "adaptive_rates": True},
+}
+
+
+@pytest.mark.parametrize("label", list(REAL))
+@pytest.mark.parametrize("name,n", [("C102", 25), ("R201", 50)])
+def test_real_nsga2_with_tv2(name, n, label):
+    flags = REAL[label]
+    c = real_cfg(3, 16, **flags)
+    c["improvements"]["local_search_params"]["p_ls"] = 0.5
+    inst = load_instance(name, n, c)
+    r1, r2 = nsga2.run(inst, c, 1), nsga2.run(inst, c, 1)
+    assert r1["pop"] == r2["pop"] and np.array_equal(r1["F"], r2["F"])     # tái lập theo seed
+    assert all(is_perm(p, n) for p in r1["pop"])
+    if flags.get("dp_split"):
+        from src.improvements.dp_split import evaluate_dp, objective_scales
+        sc = objective_scales(inst, c["improvements"]["dp_split_params"]["g3_scale"])
+        fresh = [evaluate_dp(p, inst, w, sc) for p, w in zip(r1["pop"], r1["W"])]
+    else:
+        fresh = [evaluate_detail(p, inst) for p in r1["pop"]]
+    for row, d in zip(r1["F"], fresh):           # mục tiêu NSGA-II dùng == chấm lại độc lập
+        assert np.array_equal(row, to_min_vector(d))
+    if flags.get("init_smart"):
+        assert r1["init_sources"][:3] == ["nn"] * 3 and r1["init_sources"][3:6] == ["tw"] * 3
+    if flags.get("local_search"):
+        lc = r1["ls_counters"]
+        assert lc["n_ls_calls"] == 16 * 3 and lc["n_ls_triggered"] > 0
+        # lần chấm nghiệm ban đầu trong LS thay cho lần chấm chính thức của con
+        assert r1["n_evals"] == 16 * 4 + lc["n_real_model_evals"] - lc["n_ls_triggered"]
+        assert lc["n_evals_total"] == r1["n_evals"]
