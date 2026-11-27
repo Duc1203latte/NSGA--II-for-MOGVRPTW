@@ -1,0 +1,384 @@
+{
+ "note": "HARNESS TV2 t\u1ea1m (scripts/tv2_harness.py), KH\u00d4NG ph\u1ea3i nsga2.py c\u1ee7a TV1 - s\u01a1 b\u1ed9",
+ "commit": "8aeecb4fa48fd5dc761fef8eb1420da5436a5d37",
+ "dirty_tracked_files": false,
+ "python": "3.11.18 | packaged by Anaconda, Inc. | (main, Oct 26 2026, 18:13:29) [MSC v.1942 64 bit (AMD64)]",
+ "platform": "Windows-10-10.0.26300-SP0",
+ "started": "2026-11-12T15:43:39+0700",
+ "args": {
+  "preset": "tune",
+  "variants": "",
+  "instances": "C102:25,R201:50,RC201:100",
+  "seeds": "100-104",
+  "n_pop": null,
+  "n_gen": null,
+  "max_evals": null,
+  "ls_param": [],
+  "init_param": [],
+  "workers": 16,
+  "tag": "tune_s100_104",
+  "analyze_only": false
+ },
+ "n_pop": 80,
+ "n_gen": 200,
+ "seeds": [
+  100,
+  101,
+  102,
+  103,
+  104
+ ],
+ "instances": [
+  [
+   "C102",
+   25
+  ],
+  [
+   "R201",
+   50
+  ],
+  [
+   "RC201",
+   100
+  ]
+ ],
+ "variants": {
+  "off": {
+   "init_smart": false,
+   "local_search": false,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "init_default": {
+   "init_smart": true,
+   "local_search": false,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "init_r10_10_80": {
+   "init_smart": true,
+   "local_search": false,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.1,
+     "tw": 0.1,
+     "random": 0.8
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "init_r30_30_40": {
+   "init_smart": true,
+   "local_search": false,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.3,
+     "tw": 0.3,
+     "random": 0.4
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "ls_default": {
+   "init_smart": false,
+   "local_search": true,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "ls_p01": {
+   "init_smart": false,
+   "local_search": true,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.1,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "ls_pareto": {
+   "init_smart": false,
+   "local_search": true,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "pareto",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  },
+  "ls_drift_eval": {
+   "init_smart": false,
+   "local_search": true,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 40,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "evaluate_actual"
+   }
+  },
+  "ls_evals20": {
+   "init_smart": false,
+   "local_search": true,
+   "diversity": false,
+   "dp_split": false,
+   "init_smart_params": {
+    "ratios": {
+     "nn": 0.2,
+     "tw": 0.2,
+     "random": 0.6
+    },
+    "perturb_swaps_min": 1,
+    "perturb_swaps_max": 3,
+    "keep_pure_seed": true,
+    "dedup_max_attempts": 50
+   },
+   "local_search_params": {
+    "p_ls": 0.2,
+    "max_passes": 2,
+    "max_candidate_evals": 20,
+    "max_accepted_moves": 5,
+    "operators": [
+     "two_opt",
+     "or_opt"
+    ],
+    "or_opt_lengths": [
+     1,
+     2,
+     3
+    ],
+    "strategy": "first",
+    "acceptance": "weighted",
+    "weight_distribution": "dirichlet",
+    "improvement_epsilon": 1e-10,
+    "split_drift_policy": "reject"
+   }
+  }
+ },
+ "split_rule": "capacity_time",
+ "satisfaction_time": "arrival",
+ "finished": "2026-11-12T15:56:18+0700",
+ "wall_s": 758.3102552
+}
